@@ -139,7 +139,7 @@ export default function OCRModal({
                 </pre>
                 {showFullTextOption && (
                   <div className="mt-2 text-sm text-gray-500">
-                    Showing first 1000 characters. Click "Full Text" to view complete content.
+                    Showing first 1000 characters. Click &ldquo;Full Text&rdquo; to view complete content.
                   </div>
                 )}
               </div>

@@ -74,131 +74,132 @@ export const ReportInfoStep = () => {
   };
 
   return (
-    <div className=\"space-y-8\">
+    <div className="space-y-8">
       <div>
-        <h3 className=\"text-lg font-semibold text-gray-900 mb-4\">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">
           Report Information
         </h3>
-        <p className=\"text-sm text-gray-600 mb-6\">
+        <p className="text-sm text-gray-600 mb-6">
           Provide basic information about this valuation report including purpose, client, and key dates.
         </p>
       </div>
 
-      <div className=\"grid grid-cols-1 md:grid-cols-2 gap-6\">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Report Reference */}
         <div>
-          <label htmlFor=\"ref\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+          <label htmlFor="ref" className="block text-sm font-medium text-gray-700 mb-2">
             Report Reference *
           </label>
           <input
-            type=\"text\"
-            id=\"ref\"
+            type="text"
+            id="ref"
             value={reportInfo.ref || ''}
             onChange={(e) => handleInputChange('ref', e.target.value)}
-            className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
-            placeholder=\"e.g., VR-2024-001\"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            placeholder="e.g., VR-2024-001"
           />
-          <p className=\"text-xs text-gray-500 mt-1\">
+          <p className="text-xs text-gray-500 mt-1">
             Unique reference number for this report
           </p>
         </div>
 
         {/* Purpose */}
         <div>
-          <label htmlFor=\"purpose\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+          <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-2">
             Valuation Purpose *
           </label>
           <select
-            id=\"purpose\"
+            id="purpose"
             value={reportInfo.purpose || ''}
             onChange={(e) => handleInputChange('purpose', e.target.value)}
-            className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value=\"\">Select purpose...</option>
-            <option value=\"Bank valuation\">Bank Valuation</option>
-            <option value=\"Insurance valuation\">Insurance Valuation</option>
-            <option value=\"Mortgage valuation\">Mortgage Valuation</option>
-            <option value=\"Sale/purchase\">Sale/Purchase</option>
-            <option value=\"Legal proceeding\">Legal Proceeding</option>
-            <option value=\"Taxation\">Taxation</option>
-            <option value=\"Investment analysis\">Investment Analysis</option>
-            <option value=\"Other\">Other</option>
+            <option value="">Select purpose...</option>
+            <option value="Bank valuation">Bank Valuation</option>
+            <option value="Insurance valuation">Insurance Valuation</option>
+            <option value="Investment decision">Investment Decision</option>
+            <option value="Sale/Purchase">Sale/Purchase</option>
+            <option value="Rental assessment">Rental Assessment</option>
+            <option value="Tax assessment">Tax Assessment</option>
+            <option value="Legal proceedings">Legal Proceedings</option>
+            <option value="Asset management">Asset Management</option>
+            <option value="Other">Other</option>
           </select>
         </div>
 
         {/* Report Date */}
         <div>
-          <label htmlFor=\"report-date\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+          <label htmlFor="report-date" className="block text-sm font-medium text-gray-700 mb-2">
             Report Date
           </label>
           <input
-            type=\"date\"
-            id=\"report-date\"
+            type="date"
+            id="report-date"
             value={reportInfo.report_date ? reportInfo.report_date.split('T')[0] : ''}
             onChange={(e) => handleInputChange('report_date', e.target.value ? new Date(e.target.value).toISOString() : '')}
-            className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
         {/* Inspection Date */}
         <div>
-          <label htmlFor=\"inspection-date\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+          <label htmlFor="inspection-date" className="block text-sm font-medium text-gray-700 mb-2">
             Inspection Date *
           </label>
           <input
-            type=\"date\"
-            id=\"inspection-date\"
+            type="date"
+            id="inspection-date"
             value={reportInfo.inspection_date ? reportInfo.inspection_date.split('T')[0] : ''}
             onChange={(e) => handleInputChange('inspection_date', e.target.value ? new Date(e.target.value).toISOString() : '')}
-            className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
         {/* Basis of Value */}
         <div>
-          <label htmlFor=\"basis-of-value\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+          <label htmlFor="basis-of-value" className="block text-sm font-medium text-gray-700 mb-2">
             Basis of Value
           </label>
           <select
-            id=\"basis-of-value\"
+            id="basis-of-value"
             value={reportInfo.basis_of_value || 'Market Value'}
             onChange={(e) => handleInputChange('basis_of_value', e.target.value)}
-            className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value=\"Market Value\">Market Value</option>
-            <option value=\"Investment Value\">Investment Value</option>
-            <option value=\"Fair Value\">Fair Value</option>
-            <option value=\"Liquidation Value\">Liquidation Value</option>
-            <option value=\"Insurance Value\">Insurance Value</option>
+            <option value="Market Value">Market Value</option>
+            <option value="Investment Value">Investment Value</option>
+            <option value="Fair Value">Fair Value</option>
+            <option value="Liquidation Value">Liquidation Value</option>
+            <option value="Insurance Value">Insurance Value</option>
           </select>
         </div>
 
         {/* Currency */}
         <div>
-          <label htmlFor=\"currency\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+          <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-2">
             Currency
           </label>
           <select
-            id=\"currency\"
+            id="currency"
             value={reportInfo.currency || 'LKR'}
             onChange={(e) => handleInputChange('currency', e.target.value)}
-            className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value=\"LKR\">Sri Lankan Rupee (LKR)</option>
-            <option value=\"USD\">US Dollar (USD)</option>
-            <option value=\"EUR\">Euro (EUR)</option>
+            <option value="LKR">Sri Lankan Rupee (LKR)</option>
+            <option value="USD">US Dollar (USD)</option>
+            <option value="EUR">Euro (EUR)</option>
           </select>
         </div>
       </div>
 
       {/* Client Selection */}
-      <div className=\"border-t border-gray-200 pt-6\">
-        <div className=\"flex items-center justify-between mb-4\">
-          <h4 className=\"text-md font-medium text-gray-900\">Client Information</h4>
+      <div className="border-t border-gray-200 pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-md font-medium text-gray-900">Client Information</h4>
           <button
-            type=\"button\"
+            type="button"
             onClick={() => setShowNewClientForm(!showNewClientForm)}
-            className=\"px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50\"
+            className="px-3 py-1 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50"
           >
             {showNewClientForm ? 'Cancel' : 'Add New Client'}
           </button>
@@ -206,19 +207,19 @@ export const ReportInfoStep = () => {
 
         {!showNewClientForm ? (
           <div>
-            <label htmlFor=\"client\" className=\"block text-sm font-medium text-gray-700 mb-2\">
+            <label htmlFor="client" className="block text-sm font-medium text-gray-700 mb-2">
               Select Client
             </label>
             {isLoadingClients ? (
-              <div className=\"text-sm text-gray-500\">Loading clients...</div>
+              <div className="text-sm text-gray-500">Loading clients...</div>
             ) : (
               <select
-                id=\"client\"
+                id="client"
                 value={reportInfo.client_id || ''}
                 onChange={(e) => handleInputChange('client_id', e.target.value)}
-                className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value=\"\">Select a client...</option>
+                <option value="">Select a client...</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.name} {client.email && `(${client.email})`}
@@ -228,64 +229,64 @@ export const ReportInfoStep = () => {
             )}
           </div>
         ) : (
-          <div className=\"space-y-4 bg-gray-50 p-4 rounded-lg\">
-            <h5 className=\"font-medium text-gray-900\">Add New Client</h5>
+          <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+            <h5 className="font-medium text-gray-900">Add New Client</h5>
             
-            <div className=\"grid grid-cols-1 md:grid-cols-2 gap-4\">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className=\"block text-sm font-medium text-gray-700 mb-1\">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Client Name *
                 </label>
                 <input
-                  type=\"text\"
+                  type="text"
                   value={newClient.name}
                   onChange={(e) => setNewClient({ ...newClient, name: e.target.value })}
-                  className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className=\"block text-sm font-medium text-gray-700 mb-1\">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email
                 </label>
                 <input
-                  type=\"email\"
+                  type="email"
                   value={newClient.email}
                   onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-                  className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
-              <div className=\"md:col-span-2\">
-                <label className=\"block text-sm font-medium text-gray-700 mb-1\">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Address
                 </label>
                 <textarea
                   value={newClient.address}
                   onChange={(e) => setNewClient({ ...newClient, address: e.target.value })}
                   rows={2}
-                  className=\"w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
 
-              <div className=\"md:col-span-2\">
-                <label className=\"block text-sm font-medium text-gray-700 mb-1\">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Contact Numbers
                 </label>
                 {newClient.contact_numbers.map((number, index) => (
-                  <div key={index} className=\"flex items-center space-x-2 mb-2\">
+                  <div key={index} className="flex items-center space-x-2 mb-2">
                     <input
-                      type=\"tel\"
+                      type="tel"
                       value={number}
                       onChange={(e) => updateContactNumber(index, e.target.value)}
-                      className=\"flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500\"
-                      placeholder=\"Phone number\"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Phone number"
                     />
                     {newClient.contact_numbers.length > 1 && (
                       <button
-                        type=\"button\"
+                        type="button"
                         onClick={() => removeContactNumber(index)}
-                        className=\"px-2 py-2 text-red-600 hover:text-red-800\"
+                        className="px-2 py-2 text-red-600 hover:text-red-800"
                       >
                         Remove
                       </button>
@@ -293,25 +294,25 @@ export const ReportInfoStep = () => {
                   </div>
                 ))}
                 <button
-                  type=\"button\"
+                  type="button"
                   onClick={addContactNumber}
-                  className=\"text-sm text-blue-600 hover:text-blue-800\"
+                  className="text-sm text-blue-600 hover:text-blue-800"
                 >
                   + Add another number
                 </button>
               </div>
             </div>
 
-            <div className=\"flex items-center justify-end space-x-3 pt-4\">
+            <div className="flex items-center justify-end space-x-3 pt-4">
               <button
-                type=\"button\"
+                type="button"
                 onClick={() => setShowNewClientForm(false)}
-                className=\"px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50\"
+                className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                type=\"button\"
+                type="button"
                 onClick={createClient}
                 disabled={!newClient.name.trim()}
                 className={`px-4 py-2 text-sm rounded ${

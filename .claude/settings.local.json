@@ -20,7 +20,8 @@
       "Read(/D:\\d\\valuerpro_project/**)",
       "Bash(sed:*)",
       "Bash(find:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(wmic process where:*)"
     ],
     "deny": [],
     "ask": [],

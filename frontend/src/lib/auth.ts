@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, LoginResponse } from '@/types';
 import { authAPI } from '@/lib/api';
 
@@ -154,7 +154,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     updateValuerProfile,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return React.createElement(AuthContext.Provider, { value }, children);
 };
 
 // Auth route protection helper

@@ -358,7 +358,7 @@ export interface ValidationError {
 }
 
 // Form Types
-export interface LoginFormData {
+export interface LoginFormData extends Record<string, unknown> {
   email: string;
   password: string;
 }

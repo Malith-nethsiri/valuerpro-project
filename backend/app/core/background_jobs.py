@@ -4,7 +4,7 @@ Background job queue system for long-running tasks like OCR, AI processing, and 
 import asyncio
 import json
 import logging
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List
 from datetime import datetime, timedelta
 from enum import Enum
 from dataclasses import dataclass, asdict

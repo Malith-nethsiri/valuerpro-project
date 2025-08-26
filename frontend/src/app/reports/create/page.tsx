@@ -109,7 +109,7 @@ const wizardSteps = [
 
 const CreateReportWizard = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -205,9 +205,13 @@ const CreateReportWizard = () => {
     }
   };
 
-  if (!user) {
+  if (!user && !loading) {
     router.push('/auth/login');
     return null;
+  }
+
+  if (loading) {
+    return <div>Loading...</div>;
   }
 
   return (

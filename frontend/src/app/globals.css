@@ -25,6 +25,37 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Ensure all text has proper contrast */
+* {
+  color: inherit;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #111827 !important;
+  font-weight: 600;
+}
+
+p, span, div, label {
+  color: #374151 !important;
+}
+
+/* Button text contrast */
+button {
+  color: inherit;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+.text-gray-600 {
+  color: #4b5563 !important;
+}
+
+.text-gray-900 {
+  color: #111827 !important;
+}
+
 /* Ensure input fields always have proper contrast */
 input[type="text"],
 input[type="email"], 

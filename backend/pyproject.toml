@@ -27,7 +27,21 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
-    "httpx>=0.25.0"
+    "httpx>=0.25.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.1",
+    "pytest-xdist>=3.3.1",
+    "pytest-html>=3.2.0",
+    "hypothesis>=6.87.0",
+    "faker>=19.6.0",
+    "factory-boy>=3.3.0",
+    "pytest-benchmark>=4.0.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.5",
+    "mypy>=1.5.1",
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0"
 ]
 
 [build-system]

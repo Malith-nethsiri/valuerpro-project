@@ -104,7 +104,7 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
     }
 
     if (errors.length > 0) {
-      alert('Upload errors:\\n' + errors.join('\\n'));
+      alert('Upload errors:\n' + errors.join('\n'));
     }
 
     const newFiles = [...files, ...uploadedFiles];
