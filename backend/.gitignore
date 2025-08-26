@@ -1,0 +1,170 @@
+# Backend .gitignore - ValuerPro Security
+
+# CRITICAL: Environment variables with API keys and secrets
+.env
+.env.*
+*.env
+environment.yml
+environment.yaml
+
+# CRITICAL: Google Cloud service account files
+secrets/
+*.json
+service-account*.json
+*credentials*.json
+*gcp*.json
+
+# CRITICAL: API keys and tokens
+*api*key*
+*secret*
+*token*
+*password*
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyEnv
+.python-version
+
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django/FastAPI
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Sphinx
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Storage directories
+storage/
+uploads/
+files/
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+
+# Alembic
+alembic/versions/*.py.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.backup
+*.bak
+
+# Test files that might contain sensitive data
+test_data/
+*test*secret*
+*test*credential*

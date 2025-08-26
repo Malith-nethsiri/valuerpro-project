@@ -1,0 +1,51 @@
+[project]
+name = "valuerpro-backend"
+version = "0.1.0"
+description = "ValuerPro Backend - AI-Powered Property Valuation Report System"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.12.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.6",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+    "google-cloud-vision>=3.5.0",
+    "pymupdf>=1.23.0",
+    "pdf2image>=1.16.0",
+    "reportlab>=4.0.0",
+    "python-docx>=1.1.0",
+    "jinja2>=3.1.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["tests*", "alembic*", "secrets*", "storage*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88

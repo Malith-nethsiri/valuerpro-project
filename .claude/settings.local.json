@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(alembic init:*)",
+      "Bash(alembic revision:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(tasklist:*)",
+      "Bash(curl:*)",
+      "Read(/D:\\d\\valuerpro_project/**)",
+      "Read(/D:\\d\\valuerpro_project/**)",
+      "Bash(alembic current:*)",
+      "Bash(cat:*)",
+      "Bash(taskkill:*)",
+      "Bash(wmic process where processid=1968 delete:*)",
+      "Bash(rd:*)",
+      "Bash(wmic process where processid=10160 delete:*)",
+      "Bash(alembic downgrade:*)",
+      "Bash(REPORT_ID=\"6fb71518-c4fc-458f-a6d5-4ec20d9eed30\")",
+      "Read(/D:\\d\\valuerpro_project/**)",
+      "Read(/D:\\d\\valuerpro_project/**)",
+      "Bash(sed:*)",
+      "Bash(find:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "D:\\d\\valuerpro_project",
+      "D:\\"
+    ]
+  }
+}

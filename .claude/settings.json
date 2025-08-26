@@ -1,0 +1,26 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(npm:*)",
+            "Bash(npx:*)",
+            "Bash(pnpm:*)",
+            "Bash(yarn:*)",
+            "Bash(pip:*)",
+            "Bash(uv:*)",
+            "Bash(py:*)",
+            "Bash(uvicorn:*)",
+            "Bash(docker:*)",
+            "Bash(docker-compose:*)",
+            "Bash(git:*)",
+            "Read(./**)",
+            "Write(./**)"
+        ],
+        "deny": [
+            "Read(./.env)",
+            "Read(./**/secrets/**)",
+            "Bash(rm -rf:*)",
+            "Bash(format C:*)",
+            "Bash(curl http*:*)"
+        ]
+    }
+}

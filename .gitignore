@@ -1,0 +1,108 @@
+# ValuerPro Project - Root .gitignore
+# Security: Protect all sensitive files
+
+# Environment files with credentials
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env
+*.env.*
+
+# Secrets and credentials
+secrets/
+*.json.secret
+*credentials*
+*secret*
+*key*
+*.pem
+*.p12
+*.pfx
+
+# Google Cloud credentials
+service-account*.json
+*gcp*key*.json
+*service*account*.json
+*credentials*.json
+
+# API keys files
+*api*key*
+*token*
+*secret*key*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+database.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Build artifacts
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Coverage reports
+coverage/
+.coverage
+.nyc_output
+
+# Node modules (if any JS tools used)
+node_modules/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Project specific sensitive directories
+storage/
+uploads/
+*.backup
+
+# Docker sensitive volumes
+docker-data/
+postgres-data/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Any file ending with secret, key, or password
+*secret*
+*password*
+*passwd*
