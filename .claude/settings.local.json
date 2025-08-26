@@ -19,7 +19,8 @@
       "Read(/D:\\d\\valuerpro_project/**)",
       "Read(/D:\\d\\valuerpro_project/**)",
       "Bash(sed:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(chmod:*)"
     ],
     "deny": [],
     "ask": [],
