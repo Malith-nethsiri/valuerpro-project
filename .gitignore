@@ -25,6 +25,8 @@ service-account*.json
 *gcp*key*.json
 *service*account*.json
 *credentials*.json
+credentials/
+project-*.json
 
 # API keys files
 *api*key*
