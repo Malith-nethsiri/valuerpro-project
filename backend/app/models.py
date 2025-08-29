@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float, Enum, Index
+from sqlalchemy.sql import text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID, JSON, ARRAY
@@ -46,6 +47,7 @@ class User(Base):
     # Relationships
     valuer_profile = relationship("ValuerProfile", back_populates="user", uselist=False)
     reports = relationship("Report", back_populates="author")
+    clients = relationship("Client", back_populates="author")
 
 
 class ValuerProfile(Base):
@@ -88,15 +90,22 @@ class Client(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Foreign keys
+    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    
     # Relationships
+    author = relationship("User", back_populates="clients")
     reports = relationship("Report", back_populates="client")
 
 
 class Report(Base):
     __tablename__ = "reports"
+    __table_args__ = (
+        Index('ix_reports_author_ref', 'author_id', 'ref', unique=True, postgresql_where=text("ref IS NOT NULL AND ref <> ''")),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ref = Column(String, unique=True, index=True, nullable=True)  # Report reference number
+    ref = Column(String, index=True, nullable=True)  # Report reference number - unique per author
     purpose = Column(String, nullable=True)  # Valuation purpose
     basis_of_value = Column(String, default="Market Value")  # Basis of valuation
     report_type = Column(String, default="standard")  # Report template type

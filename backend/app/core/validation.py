@@ -4,7 +4,7 @@ Comprehensive validation utilities and custom validators for the ValuerPro appli
 
 from pydantic import field_validator, BaseModel
 from typing import Any, Optional, Union, List
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 import re
 from uuid import UUID
@@ -143,15 +143,16 @@ def validate_currency_amount(amount: Union[int, float, Decimal], currency: str =
 
 
 def validate_future_date(date_value: Union[datetime, date], field_name: str = "Date") -> Union[datetime, date]:
-    """Validate that a date is not in the future"""
+    """Validate that a date is not too far in the future (allow up to 30 days)"""
     if date_value is None:
         return date_value
     
     today = datetime.now().date()
+    max_future_date = today + timedelta(days=30)
     check_date = date_value.date() if isinstance(date_value, datetime) else date_value
     
-    if check_date > today:
-        raise ValueError(f"{field_name} cannot be in the future")
+    if check_date > max_future_date:
+        raise ValueError(f"{field_name} cannot be more than 30 days in the future")
     
     return date_value
 

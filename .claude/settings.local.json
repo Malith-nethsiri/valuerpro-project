@@ -21,13 +21,17 @@
       "Bash(sed:*)",
       "Bash(find:*)",
       "Bash(chmod:*)",
-      "Bash(wmic process where:*)"
+      "Bash(wmic process where:*)",
+      "Bash(deploy-ai-testing.bat)",
+      "Bash(cmd /c:*)",
+      "Bash(copy:*)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
       "D:\\d\\valuerpro_project",
-      "D:\\"
+      "D:\\",
+      "c:\\Users\\malit\\OneDrive\\Desktop"
     ]
   }
 }

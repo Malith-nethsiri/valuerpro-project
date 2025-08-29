@@ -22,7 +22,7 @@ interface Building {
 
 export const BuildingsStep = () => {
   const { state, updateStepData } = useWizard();
-  const buildings = state.data.buildings || [];
+  const buildings = Array.isArray(state.data.buildings) ? state.data.buildings : [];
   const [selectedBuilding, setSelectedBuilding] = useState<number | null>(null);
 
   const addBuilding = () => {

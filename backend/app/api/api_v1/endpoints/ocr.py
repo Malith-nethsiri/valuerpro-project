@@ -58,9 +58,24 @@ def get_vision_client():
         )
     
     # Check for credentials
-    credentials_path = getattr(settings, 'GOOGLE_CLOUD_CREDENTIALS_PATH', None)
-    if credentials_path and os.path.exists(credentials_path):
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+    credentials_path = settings.GOOGLE_APPLICATION_CREDENTIALS
+    if credentials_path:
+        # Handle both absolute and relative paths
+        if not os.path.isabs(credentials_path):
+            # Resolve relative to the backend root directory, not this file's location
+            # __file__ is in: backend/app/api/api_v1/endpoints/ocr.py
+            # We need to go up 5 levels to reach backend root
+            backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+            credentials_path = os.path.join(backend_root, credentials_path.lstrip('./'))
+        
+        credentials_path = os.path.abspath(credentials_path)
+        if os.path.exists(credentials_path):
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Google Cloud credentials file not found at: {credentials_path}"
+            )
     elif not os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
         raise HTTPException(
             status_code=400,
@@ -182,7 +197,8 @@ async def extract_text(
         ).first()
         if not file_record:
             raise HTTPException(status_code=404, detail="File not found")
-        abs_file_path = file_record.file_path
+        # Always validate file access even when using file_id
+        abs_file_path = validate_file_access(file_record.file_path, current_user)
     else:
         # Validate file access using file_path
         abs_file_path = validate_file_access(request.file_path, current_user)
@@ -199,10 +215,10 @@ async def extract_text(
         ).first()
         if existing_ocr:
             # Return existing OCR result
-            pages_data = [OCRPageResult(page=p["page"], text=p["text"]) for p in existing_ocr.pages_data or []]
+            pages_data = [OCRPageResult(page=p["page"], text=p["text"]) for p in existing_ocr.blocks_json or []]
             return OCRResponse(
                 pages=pages_data,
-                full_text=existing_ocr.edited_text or existing_ocr.full_text or "",
+                full_text=existing_ocr.edited_text or existing_ocr.raw_text or "",
                 total_pages=len(pages_data),
                 file_path=request.file_path or file_record.file_path
             )
@@ -211,7 +227,10 @@ async def extract_text(
     vision_client = get_vision_client()
     
     # Determine file type and process accordingly
-    file_ext = Path(abs_file_path).suffix.lower()
+    try:
+        file_ext = Path(abs_file_path).suffix.lower()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing file path: {str(e)}")
     
     try:
         if file_ext == '.pdf':
@@ -226,8 +245,11 @@ async def extract_text(
             text = extract_text_from_image(image_data, vision_client)
             pages_text = [OCRPageResult(page=1, text=text)]
         
-        # Combine all text
-        raw_full_text = "\n\n".join([page.text for page in pages_text if page.text.strip()])
+        # Combine all text - handle potential Unicode issues
+        try:
+            raw_full_text = "\n\n".join([page.text for page in pages_text if page.text.strip()])
+        except Exception as e:
+            raw_full_text = ""
         
         # Process with translation if available
         translation_applied = False
@@ -239,7 +261,7 @@ async def extract_text(
                 processed_full_text, detected_languages = process_mixed_language_text(raw_full_text)
                 translation_applied = detected_languages != "en" and "si" in detected_languages
             except Exception as e:
-                print(f"Translation processing failed: {e}")
+                pass  # Continue without translation
         
         # Process with AI extraction
         ai_extracted_data = None
@@ -255,7 +277,6 @@ async def extract_text(
                     "general_data": ai_result.get("general_data", {})
                 }
             except Exception as e:
-                print(f"AI extraction failed: {e}")
                 ai_extracted_data = {"error": f"AI processing failed: {str(e)}"}
         
         # Calculate processing time
@@ -263,22 +284,26 @@ async def extract_text(
         
         # Save OCR result to database if we have a file record
         if file_record:
-            # Convert pages_text to JSON format for database
-            pages_data_json = [{"page": page.page, "text": page.text} for page in pages_text]
-            
-            ocr_result = OCRResult(
-                full_text=processed_full_text,  # Store processed (translated) text
-                pages_data=pages_data_json,
-                confidence_score=85,  # Placeholder - Google Vision doesn't provide overall confidence
-                processing_time=processing_time,
-                ocr_engine="google_vision",
-                language_detected=detected_languages,
-                file_id=file_record.id,
-                processed_by=current_user.id
-            )
-            db.add(ocr_result)
-            db.commit()
-            db.refresh(ocr_result)
+            try:
+                # Convert pages_text to JSON format for database
+                pages_data_json = [{"page": page.page, "text": page.text} for page in pages_text]
+                
+                ocr_result = OCRResult(
+                    raw_text=processed_full_text,  # Store processed (translated) text
+                    blocks_json=pages_data_json,  # Use blocks_json instead of pages_data
+                    confidence_score=85,  # Placeholder - Google Vision doesn't provide overall confidence
+                    processing_time=processing_time,
+                    ocr_engine="google_vision",
+                    language=detected_languages,  # Use language instead of language_detected
+                    file_id=file_record.id,
+                    processed_by=current_user.id
+                )
+                db.add(ocr_result)
+                db.commit()
+                db.refresh(ocr_result)
+            except Exception as e:
+                # Don't fail the whole request if database save fails
+                pass
         
         return OCRResponse(
             pages=pages_text,
@@ -381,7 +406,7 @@ async def analyze_document(
         if not ocr_result:
             raise HTTPException(status_code=404, detail="OCR result not found. Please run OCR first.")
         
-        ocr_text = ocr_result.edited_text or ocr_result.full_text
+        ocr_text = ocr_result.edited_text or ocr_result.raw_text
     else:
         raise HTTPException(status_code=400, detail="file_id is required for document analysis")
     

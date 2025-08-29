@@ -33,7 +33,9 @@ def create_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    client = Client(**client_in.model_dump())
+    client_data = client_in.model_dump()
+    client_data["author_id"] = current_user.id  # Associate with current user
+    client = Client(**client_data)
     db.add(client)
     db.commit()
     db.refresh(client)
@@ -47,8 +49,47 @@ def list_clients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    clients = db.query(Client).offset(skip).limit(limit).all()
+    # Filter clients by current user
+    clients = db.query(Client).filter(Client.author_id == current_user.id).offset(skip).limit(limit).all()
     return clients
+
+
+@router.get("/clients/{client_id}", response_model=ClientSchema)
+def get_client(
+    client_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    client = db.query(Client).filter(
+        Client.id == client_id, 
+        Client.author_id == current_user.id
+    ).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return client
+
+
+@router.put("/clients/{client_id}", response_model=ClientSchema)
+def update_client(
+    client_id: str,
+    client_in: ClientCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    client = db.query(Client).filter(
+        Client.id == client_id, 
+        Client.author_id == current_user.id
+    ).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Update client data
+    for field, value in client_in.model_dump().items():
+        setattr(client, field, value)
+    
+    db.commit()
+    db.refresh(client)
+    return client
 
 
 # Report management endpoints
@@ -72,7 +113,10 @@ def create_report(
     # Create client if provided
     client = None
     if report_in.client_id:
-        client = db.query(Client).filter(Client.id == report_in.client_id).first()
+        client = db.query(Client).filter(
+            Client.id == report_in.client_id,
+            Client.author_id == current_user.id
+        ).first()
         if not client:
             raise HTTPException(status_code=400, detail="Client not found")
     
@@ -163,12 +207,55 @@ def update_report(
         raise HTTPException(status_code=403, detail="Not authorized to access this report")
     
     update_data = report_in.model_dump(exclude_unset=True)
+    
+    # Check for duplicate reference if ref is being updated
+    if 'ref' in update_data and update_data['ref']:
+        # Only check if the reference is actually changing
+        if update_data['ref'] != report.ref:
+            existing_report = db.query(Report).filter(
+                Report.ref == update_data['ref'],
+                Report.author_id == current_user.id,
+                Report.id != report_id  # Exclude current report
+            ).first()
+            
+            if existing_report:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Reference number '{update_data['ref']}' already exists"
+                )
+    
     for field, value in update_data.items():
         setattr(report, field, value)
     
     db.commit()
     db.refresh(report)
     return report
+
+
+@router.get("/check-reference/{ref}")
+def check_reference_availability(
+    ref: str,
+    report_id: Optional[UUID] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Check if a reference number is available for use"""
+    query = db.query(Report).filter(
+        Report.ref == ref,
+        Report.author_id == current_user.id
+    )
+    
+    # Exclude current report if updating
+    if report_id:
+        query = query.filter(Report.id != report_id)
+    
+    existing_report = query.first()
+    
+    return {
+        "available": existing_report is None,
+        "ref": ref,
+        "message": "Reference available" if existing_report is None else f"Reference '{ref}' already exists"
+    }
 
 
 @router.delete("/{report_id}")

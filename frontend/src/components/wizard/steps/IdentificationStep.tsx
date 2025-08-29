@@ -4,12 +4,20 @@ import { ValidatedInput, ValidatedTextarea } from '@/components/ui/ValidatedInpu
 import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { useStepValidation } from '@/hooks/useFieldValidation';
 import { validationSchemas } from '@/hooks/useFieldValidation';
+import { filesAPI, ocrAPI } from '@/lib/api';
 
 export const IdentificationStep = () => {
   const { state, updateStepData, validateStep } = useWizard();
   const identification = state.data.identification;
   const { errors, isValid, validate } = useStepValidation(1);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
+  
+  // OCR/AI functionality state
+  const [uploading, setUploading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<any>(null);
+  const [extractedData, setExtractedData] = useState<any>(null);
+  const [showExtractedData, setShowExtractedData] = useState(false);
 
   const handleInputChange = (field: string, value: any, isFieldValid: boolean) => {
     updateStepData('identification', { [field]: value });
@@ -47,6 +55,105 @@ export const IdentificationStep = () => {
     });
   };
 
+  // Handle file upload and OCR processing
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, docType: 'survey' | 'deed') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      // Upload file
+      const uploadResponse = await filesAPI.uploadSingle(file, state.reportId);
+      setUploadedFile(uploadResponse);
+
+      // Start OCR processing
+      setAnalyzing(true);
+      const ocrResponse = await ocrAPI.extractText(undefined, uploadResponse.file_id);
+      
+      // Analyze document with AI
+      const analysisResponse = await ocrAPI.analyzeDocument(uploadResponse.file_id);
+      
+      // Extract relevant data from AI analysis
+      const extracted = parseExtractedData(analysisResponse, docType);
+      setExtractedData(extracted);
+      setShowExtractedData(true);
+      
+    } catch (error) {
+      console.error('Failed to process document:', error);
+      alert('Failed to process document. Please try again.');
+    } finally {
+      setUploading(false);
+      setAnalyzing(false);
+    }
+  };
+
+  // Parse extracted data from AI analysis
+  const parseExtractedData = (analysisResponse: any, docType: 'survey' | 'deed') => {
+    // Extract from the correct nested structure returned by the backend API
+    const extracted: any = {};
+    const documentAnalysis = analysisResponse.document_analysis;
+    const extractedData = documentAnalysis?.extracted_data || {};
+    const generalData = documentAnalysis?.general_data || {};
+    
+    if (docType === 'survey') {
+      // Extract survey plan specific fields from correct nested structure
+      extracted.lot_number = extractedData.lot_number || generalData.lot_number;
+      extracted.plan_number = extractedData.plan_number;
+      extracted.plan_date = extractedData.plan_date;
+      extracted.surveyor_name = extractedData.surveyor_name;
+      extracted.land_name = extractedData.land_name || generalData.property_address;
+      extracted.extent_perches = extractedData.extent ? parseFloat(extractedData.extent.split(' ')[0]) : null;
+      extracted.boundaries = {
+        north: extractedData.boundaries?.north,
+        south: extractedData.boundaries?.south,
+        east: extractedData.boundaries?.east,
+        west: extractedData.boundaries?.west
+      };
+      
+      // Also extract general property data
+      if (generalData.owner_name) extracted.title_owner = generalData.owner_name;
+      if (generalData.location_details?.village) extracted.land_name = generalData.location_details.village;
+      
+    } else if (docType === 'deed') {
+      // Extract deed specific fields from correct nested structure
+      extracted.title_owner = extractedData.parties?.purchaser || extractedData.parties?.vendor || generalData.owner_name;
+      extracted.deed_no = extractedData.deed_number;
+      extracted.deed_date = extractedData.deed_date;
+      extracted.notary = extractedData.notary_attorney;
+      extracted.interest = 'freehold'; // Default, could be enhanced based on deed analysis
+      
+      // Also extract from general data
+      if (extractedData.lot_number) extracted.lot_number = extractedData.lot_number;
+      if (extractedData.plan_reference) extracted.plan_number = extractedData.plan_reference;
+    }
+    
+    return extracted;
+  };
+
+  // Apply extracted data to form
+  const applyExtractedData = () => {
+    if (!extractedData) return;
+    
+    Object.keys(extractedData).forEach(key => {
+      if (extractedData[key] !== null && extractedData[key] !== undefined && extractedData[key] !== '') {
+        if (key === 'boundaries') {
+          updateStepData('identification', { [key]: extractedData[key] });
+        } else {
+          updateStepData('identification', { [key]: extractedData[key] });
+        }
+      }
+    });
+    
+    setShowExtractedData(false);
+    alert('Data applied successfully! Please review and adjust as needed.');
+  };
+
+  // Reject extracted data
+  const rejectExtractedData = () => {
+    setExtractedData(null);
+    setShowExtractedData(false);
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -54,9 +161,137 @@ export const IdentificationStep = () => {
           Property Identification & Title
         </h3>
         <p className="text-sm text-gray-600 mb-6">
-          Enter the property identification details from the survey plan and title documents.
+          Upload your survey plan or deed to automatically extract property identification details, or enter the details manually.
         </p>
       </div>
+
+      {/* AI Document Upload Section - Moved to top */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+        <h4 className="text-lg font-medium text-blue-900 mb-3 flex items-center">
+          🤖 AI Document Analysis
+        </h4>
+        <p className="text-sm text-blue-700 mb-4">
+          Upload your survey plan or deed to automatically extract property identification details using OCR and AI technology.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-blue-800 mb-2">
+              Upload Survey Plan
+            </label>
+            <div className="relative">
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.tiff"
+                onChange={(e) => handleFileUpload(e, 'survey')}
+                disabled={uploading || analyzing}
+                className="hidden"
+                id="survey-upload"
+              />
+              <label
+                htmlFor="survey-upload"
+                className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                  uploading || analyzing
+                    ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                    : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
+                }`}
+              >
+                {uploading ? (
+                  <span className="text-blue-600">📤 Uploading...</span>
+                ) : analyzing ? (
+                  <span className="text-blue-600">🔍 Analyzing...</span>
+                ) : (
+                  <span className="text-blue-700">📋 Choose Survey Plan File</span>
+                )}
+              </label>
+            </div>
+            <p className="text-xs text-blue-600 mt-1">PDF, JPG, PNG, TIFF supported</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-blue-800 mb-2">
+              Upload Deed
+            </label>
+            <div className="relative">
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.tiff"
+                onChange={(e) => handleFileUpload(e, 'deed')}
+                disabled={uploading || analyzing}
+                className="hidden"
+                id="deed-upload"
+              />
+              <label
+                htmlFor="deed-upload"
+                className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                  uploading || analyzing
+                    ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
+                    : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
+                }`}
+              >
+                {uploading ? (
+                  <span className="text-blue-600">📤 Uploading...</span>
+                ) : analyzing ? (
+                  <span className="text-blue-600">🔍 Analyzing...</span>
+                ) : (
+                  <span className="text-blue-700">📄 Choose Deed File</span>
+                )}
+              </label>
+            </div>
+            <p className="text-xs text-blue-600 mt-1">PDF, JPG, PNG, TIFF supported</p>
+          </div>
+        </div>
+
+        {uploadedFile && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+            <p className="text-sm text-green-800">
+              ✅ File uploaded: <strong>{uploadedFile.filename}</strong>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Extracted Data Review */}
+      {showExtractedData && extractedData && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <h4 className="text-lg font-medium text-yellow-900 mb-3">
+            📊 Extracted Data - Review & Apply
+          </h4>
+          <p className="text-sm text-yellow-800 mb-4">
+            The AI has extracted the following data from your document. Please review for accuracy before applying to the form.
+          </p>
+          
+          <div className="bg-white rounded border p-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              {Object.entries(extractedData).map(([key, value]) => (
+                value && (
+                  <div key={key}>
+                    <strong className="text-gray-700 capitalize">{key.replace(/_/g, ' ')}: </strong>
+                    <span className="text-gray-900">
+                      {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
+                    </span>
+                  </div>
+                )
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex space-x-3">
+            <button
+              onClick={applyExtractedData}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              ✅ Apply Data
+            </button>
+            <button
+              onClick={rejectExtractedData}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            >
+              ❌ Reject Data
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Step-level validation errors */}
       {errors.length > 0 && (
@@ -337,23 +572,6 @@ export const IdentificationStep = () => {
         </div>
       </div>
 
-      {/* AI Suggestions Panel */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-gray-900 mb-3">
-          🤖 AI Document Analysis
-        </h4>
-        <p className="text-sm text-gray-600 mb-3">
-          Upload your survey plan or deed to automatically extract property identification details.
-        </p>
-        <div className="flex space-x-2">
-          <button className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-            Upload Survey Plan
-          </button>
-          <button className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50">
-            Upload Deed
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

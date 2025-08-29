@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Google Cloud APIs (optional for now)
+    # Google Cloud APIs
     GOOGLE_CLOUD_PROJECT_ID: str = ""
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
     GOOGLE_CLOUD_CREDENTIALS_PATH: str = ""
@@ -57,5 +57,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+def get_settings() -> Settings:
+    return settings
 
 # CORS configuration is now handled directly in main.py

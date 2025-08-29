@@ -70,8 +70,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const userData = await authAPI.getMe();
       setUser(userData);
     } catch (error) {
-      // Token is invalid, remove it
+      // Token is invalid, remove it and clear user
       localStorage.removeItem('access_token');
+      setUser(null);
     } finally {
       setLoading(false);
     }

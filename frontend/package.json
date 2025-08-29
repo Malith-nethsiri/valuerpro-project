@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@playwright/test": "^1.55.0",
     "axios": "^1.6.0",
     "js-cookie": "^3.0.5",
     "next": "15.5.0",
@@ -34,12 +35,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "axe-playwright": "^2.0.1",
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
+    "lighthouse": "^11.5.0",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "@playwright/test": "^1.42.0",
-    "axe-playwright": "^2.0.1",
-    "lighthouse": "^11.5.0"
+    "typescript": "^5"
   }
 }

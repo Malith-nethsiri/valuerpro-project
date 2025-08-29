@@ -3,13 +3,14 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { authAPI } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { LoginFormData } from '@/types';
 import { parseAPIError, validateEmail, validatePassword } from '@/lib/error-handler';
 import { useFormValidation } from '@/hooks/useAsyncState';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,10 +42,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await authAPI.login(values.email, values.password);
-      
-      // Store the token
-      localStorage.setItem('access_token', response.access_token);
+      await login(values.email, values.password);
       
       // Redirect to dashboard
       router.push('/dashboard');

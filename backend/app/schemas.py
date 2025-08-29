@@ -37,7 +37,7 @@ class ValuerProfileBase(BaseModel):
 
 
 class ValuerProfileCreate(ValuerProfileBase):
-    user_id: UUID
+    pass  # user_id will be set from authenticated user
 
 
 class ValuerProfileUpdate(ValuerProfileBase):
@@ -55,6 +55,32 @@ class ValuerProfile(ValuerProfileBase):
 
 class UserCreate(UserBase):
     password: str
+    
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v):
+        """Validate password strength during registration"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        
+        # Check for at least one uppercase letter
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        
+        # Check for at least one lowercase letter
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        
+        # Check for at least one digit
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one number')
+        
+        # Check for at least one special character
+        special_chars = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        if not any(c in special_chars for c in v):
+            raise ValueError('Password must contain at least one special character')
+        
+        return v
 
 
 class UserUpdate(BaseModel):

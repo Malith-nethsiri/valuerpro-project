@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { WizardProvider } from '@/components/wizard/WizardProvider';
 import { WizardLayout } from '@/components/wizard/WizardLayout';
@@ -117,6 +117,13 @@ const CreateReportWizard = () => {
   const [steps, setSteps] = useState(wizardSteps);
   const [currentStep, setCurrentStep] = useState(0);
 
+  // Handle authentication redirect
+  useEffect(() => {
+    if (!user && !loading) {
+      router.push('/auth/login');
+    }
+  }, [user, loading, router]);
+
   const updateStepCompletion = (stepIndex: number, completed: boolean) => {
     setSteps(prev => prev.map((step, index) => ({
       ...step,
@@ -206,7 +213,6 @@ const CreateReportWizard = () => {
   };
 
   if (!user && !loading) {
-    router.push('/auth/login');
     return null;
   }
 

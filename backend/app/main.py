@@ -4,6 +4,10 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.api.api_v1.api import api_router
+from app.api.simple_monitoring import router as monitoring_router
+from app.api.optimization import router as optimization_router
+from app.api.production_integration import router as production_router
+from app.api.maintenance import router as maintenance_router
 
 
 @asynccontextmanager
@@ -35,6 +39,10 @@ app.add_middleware(
 
 # Include routers
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(monitoring_router)
+app.include_router(optimization_router)
+app.include_router(production_router)
+app.include_router(maintenance_router)
 
 
 @app.get("/health")

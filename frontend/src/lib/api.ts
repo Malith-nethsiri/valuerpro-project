@@ -30,9 +30,15 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
-      localStorage.removeItem('access_token');
-      window.location.href = '/auth/login';
+      // Only redirect if not already on login/register pages
+      const currentPath = window.location.pathname;
+      const isAuthPage = currentPath.startsWith('/auth/');
+      
+      if (!isAuthPage) {
+        // Clear token and redirect to login
+        localStorage.removeItem('access_token');
+        window.location.href = '/auth/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -98,6 +104,11 @@ export const authAPI = {
     return response.data;
   },
   
+  getCurrentUser: async (): Promise<User> => {
+    const response = await apiClient.get('/auth/me');
+    return response.data;
+  },
+  
   getMe: async (): Promise<User> => {
     const response = await apiClient.get('/auth/me');
     return response.data;
@@ -111,6 +122,11 @@ export const clientsAPI = {
     return response.data;
   },
   
+  get: async (id: string): Promise<any> => {
+    const response = await apiClient.get(`/reports/clients/${id}`);
+    return response.data;
+  },
+  
   create: async (clientData: {
     name: string;
     address?: string;
@@ -118,6 +134,16 @@ export const clientsAPI = {
     email?: string;
   }): Promise<any> => {
     const response = await apiClient.post('/reports/clients/', clientData);
+    return response.data;
+  },
+  
+  update: async (id: string, clientData: {
+    name: string;
+    address?: string;
+    contact_numbers?: string[];
+    email?: string;
+  }): Promise<any> => {
+    const response = await apiClient.put(`/reports/clients/${id}`, clientData);
     return response.data;
   },
 };
@@ -216,6 +242,16 @@ export const reportsAPI = {
     const response = await apiClient.get(`/reports/${reportId}/generate-docx`, {
       responseType: 'blob',
     });
+    return response.data;
+  },
+
+  checkReferenceAvailability: async (ref: string, reportId?: string): Promise<{
+    available: boolean;
+    ref: string;
+    message: string;
+  }> => {
+    const params = reportId ? { report_id: reportId } : {};
+    const response = await apiClient.get(`/reports/check-reference/${encodeURIComponent(ref)}`, { params });
     return response.data;
   },
 };

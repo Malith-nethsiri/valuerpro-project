@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authAPI } from '@/lib/api';
+import { validatePasswordStrength } from '@/lib/error-handler';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -19,19 +20,36 @@ export default function RegisterPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
+    
+    // Validate password strength in real-time
+    if (name === 'password') {
+      const passwordValidation = validatePasswordStrength(value);
+      setPasswordError(passwordValidation || '');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Validate password strength
+    const passwordValidation = validatePasswordStrength(formData.password);
+    if (passwordValidation) {
+      setPasswordError(passwordValidation);
+      setError('Please fix the password requirements below');
+      setLoading(false);
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -109,10 +127,16 @@ export default function RegisterPage() {
                   name="password"
                   type="password"
                   required
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className={`mt-1 appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
+                    passwordError ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   value={formData.password}
                   onChange={handleChange}
+                  placeholder="Password (8+ chars, A-Z, a-z, 0-9, special)"
                 />
+                {passwordError && (
+                  <div className="text-red-500 text-xs mt-1">{passwordError}</div>
+                )}
               </div>
 
               <div>

@@ -2,18 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authAPI, reportsAPI } from '@/lib/api';
-
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  title?: string;
-  qualifications?: string;
-  panel_memberships?: string;
-  business_address?: string;
-  contact_numbers?: string;
-}
+import { reportsAPI } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 interface Report {
   id: string;
@@ -25,45 +15,36 @@ interface Report {
 }
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading: authLoading, logout } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!authLoading && !user) {
       router.push('/auth/login');
       return;
     }
 
-    loadData();
-  }, [router]);
+    if (user) {
+      loadData();
+    }
+  }, [user, authLoading, router]);
 
   const loadData = async () => {
     try {
-      const [userResponse, reportsResponse] = await Promise.all([
-        authAPI.getMe(),
-        reportsAPI.list(),
-      ]);
-      
-      setUser(userResponse);
+      const reportsResponse = await reportsAPI.list();
       setReports(reportsResponse);
     } catch (err: any) {
-      setError('Failed to load data');
-      if (err.response?.status === 401) {
-        localStorage.removeItem('access_token');
-        router.push('/auth/login');
-      }
+      setError('Failed to load reports');
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    router.push('/auth/login');
+    logout();
   };
 
   const handleCreateReport = () => {
@@ -90,12 +71,16 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Loading...</div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null; // Will redirect to login in useEffect
   }
 
   return (
@@ -113,8 +98,14 @@ export default function DashboardPage() {
                 Welcome, {user?.full_name}
               </span>
               <button
+                onClick={() => router.push('/profile')}
+                className="text-indigo-600 hover:text-indigo-500 border border-indigo-600 px-3 py-1 rounded-md hover:bg-indigo-50"
+              >
+                Edit Profile
+              </button>
+              <button
                 onClick={handleLogout}
-                className="text-indigo-600 hover:text-indigo-500"
+                className="text-red-600 hover:text-red-500"
               >
                 Logout
               </button>

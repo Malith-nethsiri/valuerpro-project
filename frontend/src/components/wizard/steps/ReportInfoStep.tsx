@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useWizard } from '../WizardProvider';
-import { clientsAPI } from '@/lib/api';
+import { clientsAPI, reportsAPI } from '@/lib/api';
 import { Client } from '@/types';
 
 export const ReportInfoStep = () => {
@@ -8,18 +8,42 @@ export const ReportInfoStep = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [isLoadingClients, setIsLoadingClients] = useState(false);
   const [showNewClientForm, setShowNewClientForm] = useState(false);
+  const [editingClient, setEditingClient] = useState<string | null>(null);
   const [newClient, setNewClient] = useState({
     name: '',
     address: '',
     email: '',
     contact_numbers: [''],
   });
+  const [editClient, setEditClient] = useState({
+    name: '',
+    address: '',
+    email: '',
+    contact_numbers: [''],
+  });
+
+  // Reference validation state
+  const [referenceError, setReferenceError] = useState<string>('');
+  const [isCheckingReference, setIsCheckingReference] = useState(false);
 
   const reportInfo = state.data.reportInfo;
 
   useEffect(() => {
     loadClients();
   }, []);
+
+  // Debounced reference validation
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (reportInfo.ref) {
+        checkReferenceAvailability(reportInfo.ref);
+      } else {
+        setReferenceError('');
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [reportInfo.ref, state.reportId]);
 
   const loadClients = async () => {
     try {
@@ -51,6 +75,68 @@ export const ReportInfoStep = () => {
     }
   };
 
+  const startEditingClient = async (clientId: string) => {
+    try {
+      const client = await clientsAPI.get(clientId);
+      setEditClient({
+        name: client.name || '',
+        address: client.address || '',
+        email: client.email || '',
+        contact_numbers: client.contact_numbers?.length ? client.contact_numbers : [''],
+      });
+      setEditingClient(clientId);
+    } catch (error) {
+      console.error('Error loading client details:', error);
+    }
+  };
+
+  const saveEditClient = async () => {
+    if (!editingClient) return;
+    
+    try {
+      const updatedClient = await clientsAPI.update(editingClient, {
+        name: editClient.name,
+        address: editClient.address,
+        email: editClient.email,
+        contact_numbers: editClient.contact_numbers.filter(num => num.trim() !== ''),
+      });
+      
+      setClients(clients.map(c => c.id === editingClient ? updatedClient : c));
+      setEditingClient(null);
+      setEditClient({ name: '', address: '', email: '', contact_numbers: [''] });
+    } catch (error) {
+      console.error('Error updating client:', error);
+    }
+  };
+
+  const cancelEditClient = () => {
+    setEditingClient(null);
+    setEditClient({ name: '', address: '', email: '', contact_numbers: [''] });
+  };
+
+  // Reference validation function
+  const checkReferenceAvailability = async (ref: string) => {
+    if (!ref || ref.trim() === '') {
+      setReferenceError('');
+      return;
+    }
+
+    setIsCheckingReference(true);
+    setReferenceError('');
+
+    try {
+      const result = await reportsAPI.checkReferenceAvailability(ref.trim(), state.reportId);
+      if (!result.available) {
+        setReferenceError(result.message);
+      }
+    } catch (error) {
+      console.error('Error checking reference:', error);
+      setReferenceError('Error checking reference availability');
+    } finally {
+      setIsCheckingReference(false);
+    }
+  };
+
   const handleInputChange = (field: string, value: any) => {
     updateStepData('reportInfo', { [field]: value });
   };
@@ -73,6 +159,25 @@ export const ReportInfoStep = () => {
     setNewClient({ ...newClient, contact_numbers: updated });
   };
 
+  // Edit client contact number functions
+  const addEditContactNumber = () => {
+    setEditClient({
+      ...editClient,
+      contact_numbers: [...editClient.contact_numbers, ''],
+    });
+  };
+
+  const updateEditContactNumber = (index: number, value: string) => {
+    const updated = [...editClient.contact_numbers];
+    updated[index] = value;
+    setEditClient({ ...editClient, contact_numbers: updated });
+  };
+
+  const removeEditContactNumber = (index: number) => {
+    const updated = editClient.contact_numbers.filter((_, i) => i !== index);
+    setEditClient({ ...editClient, contact_numbers: updated });
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -90,17 +195,34 @@ export const ReportInfoStep = () => {
           <label htmlFor="ref" className="block text-sm font-medium text-gray-700 mb-2">
             Report Reference *
           </label>
-          <input
-            type="text"
-            id="ref"
-            value={reportInfo.ref || ''}
-            onChange={(e) => handleInputChange('ref', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="e.g., VR-2024-001"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Unique reference number for this report
-          </p>
+          <div className="relative">
+            <input
+              type="text"
+              id="ref"
+              value={reportInfo.ref || ''}
+              onChange={(e) => handleInputChange('ref', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none ${
+                referenceError
+                  ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                  : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+              }`}
+              placeholder="e.g., VR-2024-001"
+            />
+            {isCheckingReference && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+          </div>
+          {referenceError ? (
+            <p className="text-xs text-red-600 mt-1">
+              {referenceError}
+            </p>
+          ) : (
+            <p className="text-xs text-gray-500 mt-1">
+              Unique reference number for this report
+            </p>
+          )}
         </div>
 
         {/* Purpose */}
@@ -205,7 +327,7 @@ export const ReportInfoStep = () => {
           </button>
         </div>
 
-        {!showNewClientForm ? (
+        {!showNewClientForm && !editingClient && (
           <div>
             <label htmlFor="client" className="block text-sm font-medium text-gray-700 mb-2">
               Select Client
@@ -213,22 +335,35 @@ export const ReportInfoStep = () => {
             {isLoadingClients ? (
               <div className="text-sm text-gray-500">Loading clients...</div>
             ) : (
-              <select
-                id="client"
-                value={reportInfo.client_id || ''}
-                onChange={(e) => handleInputChange('client_id', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select a client...</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name} {client.email && `(${client.email})`}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <select
+                  id="client"
+                  value={reportInfo.client_id || ''}
+                  onChange={(e) => handleInputChange('client_id', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Select a client...</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name} {client.email && `(${client.email})`}
+                    </option>
+                  ))}
+                </select>
+                {reportInfo.client_id && (
+                  <button
+                    type="button"
+                    onClick={() => startEditingClient(reportInfo.client_id)}
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Edit Selected Client
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        ) : (
+        )}
+        
+        {showNewClientForm && (
           <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
             <h5 className="font-medium text-gray-900">Add New Client</h5>
             
@@ -322,6 +457,105 @@ export const ReportInfoStep = () => {
                 }`}
               >
                 Create Client
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {editingClient && (
+          <div className="space-y-4 bg-blue-50 p-4 rounded-lg">
+            <h5 className="font-medium text-gray-900">Edit Client</h5>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client Name *
+                </label>
+                <input
+                  type="text"
+                  value={editClient.name}
+                  onChange={(e) => setEditClient({ ...editClient, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editClient.email}
+                  onChange={(e) => setEditClient({ ...editClient, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <textarea
+                  value={editClient.address}
+                  onChange={(e) => setEditClient({ ...editClient, address: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contact Numbers
+                </label>
+                {editClient.contact_numbers.map((number, index) => (
+                  <div key={index} className="flex items-center space-x-2 mb-2">
+                    <input
+                      type="tel"
+                      value={number}
+                      onChange={(e) => updateEditContactNumber(index, e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Phone number"
+                    />
+                    {editClient.contact_numbers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeEditContactNumber(index)}
+                        className="px-2 py-2 text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addEditContactNumber}
+                  className="text-sm text-blue-600 hover:text-blue-800"
+                >
+                  + Add another number
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={cancelEditClient}
+                className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveEditClient}
+                disabled={!editClient.name.trim()}
+                className={`px-4 py-2 text-sm rounded ${
+                  editClient.name.trim()
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Save Changes
               </button>
             </div>
           </div>
