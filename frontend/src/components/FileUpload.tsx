@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { apiClient, ocrAPI } from '@/lib/api';
 import OCRModal from './OCRModal';
 import AIAnalysisModal from './AIAnalysisModal';
+import BatchAnalysisModal from './BatchAnalysisModal';
 
 interface UploadedFile {
   file_id: string;
@@ -26,9 +27,10 @@ interface FileUploadProps {
   reportId?: string;
   onFilesUploaded?: (files: UploadedFile[]) => void;
   multiple?: boolean;
+  onAiDataExtracted?: (aiAnalysis: any) => void; // Callback for AI auto-population
 }
 
-export default function FileUpload({ reportId, onFilesUploaded, multiple = true }: FileUploadProps) {
+export default function FileUpload({ reportId, onFilesUploaded, multiple = true, onAiDataExtracted }: FileUploadProps) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -39,6 +41,9 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
   const [analyzingFiles, setAnalyzingFiles] = useState<Set<string>>(new Set());
   const [aiAnalysisModalOpen, setAiAnalysisModalOpen] = useState(false);
   const [selectedAnalysis, setSelectedAnalysis] = useState<any>(null);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchAnalysisModalOpen, setBatchAnalysisModalOpen] = useState(false);
+  const [batchAnalysisResult, setBatchAnalysisResult] = useState<any>(null);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -50,14 +55,23 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
 
   const validateFile = (file: File) => {
     const maxSize = 10 * 1024 * 1024; // 10MB
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg', 
+      'image/jpg',
+      'image/png',
+      'image/tiff',
+      'image/tif',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      'application/msword' // .doc
+    ];
     
     if (file.size > maxSize) {
       throw new Error(`File "${file.name}" is too large. Maximum size is 10MB.`);
     }
     
     if (!allowedTypes.includes(file.type)) {
-      throw new Error(`File "${file.name}" has unsupported format. Allowed: PDF, JPG, PNG.`);
+      throw new Error(`File "${file.name}" has unsupported format. Allowed: PDF, JPG, PNG, TIFF, DOCX.`);
     }
   };
 
@@ -91,20 +105,47 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
     setUploading(true);
     const uploadedFiles: UploadedFile[] = [];
     const errors: string[] = [];
+    const totalFiles = fileList.length;
 
+    // Validate all files first
+    const validFiles: File[] = [];
     for (const file of fileList) {
       try {
         validateFile(file);
-        const uploadedFile = await uploadFile(file);
-        uploadedFiles.push(uploadedFile);
+        validFiles.push(file);
       } catch (error: any) {
         errors.push(error.message);
       }
-      setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
     }
 
+    // Process uploads with better progress tracking
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      try {
+        const uploadedFile = await uploadFile(file);
+        uploadedFiles.push(uploadedFile);
+      } catch (error: any) {
+        errors.push(`Upload failed for "${file.name}": ${error.message}`);
+      }
+    }
+
+    // Show comprehensive results
     if (errors.length > 0) {
-      alert('Upload errors:\n' + errors.join('\n'));
+      const successCount = uploadedFiles.length;
+      const errorCount = errors.length;
+      
+      let message = '';
+      if (successCount > 0) {
+        message += `Successfully uploaded ${successCount} file${successCount > 1 ? 's' : ''}.\n`;
+      }
+      if (errorCount > 0) {
+        message += `${errorCount} file${errorCount > 1 ? 's' : ''} failed to upload:\n${errors.join('\n')}`;
+      }
+      alert(message);
+    } else if (uploadedFiles.length > 0) {
+      // Success message for all files
+      const count = uploadedFiles.length;
+      console.log(`Successfully uploaded ${count} file${count > 1 ? 's' : ''}`);
     }
 
     const newFiles = [...files, ...uploadedFiles];
@@ -326,6 +367,11 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
           aiAnalysis: result.document_analysis
         }
       }));
+
+      // Trigger auto-population if callback is provided
+      if (onAiDataExtracted && result.document_analysis) {
+        onAiDataExtracted(result.document_analysis);
+      }
       
     } catch (error: any) {
       alert(`Document analysis failed for ${file.original_filename}: ${error.response?.data?.detail || error.message}`);
@@ -353,6 +399,63 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
     setAiAnalysisModalOpen(true);
   };
 
+  const runBatchAnalysis = async () => {
+    if (files.length === 0) {
+      alert('No files to process');
+      return;
+    }
+
+    if (files.length < 2) {
+      alert('Batch analysis requires at least 2 files for cross-document validation');
+      return;
+    }
+
+    setBatchProcessing(true);
+    
+    try {
+      const fileIds = files.map(f => f.file_id);
+      
+      const response = await apiClient.post('/batch-ocr/batch-process', {
+        file_ids: fileIds,
+        consolidate_analysis: true,
+        auto_populate: true
+      });
+      
+      setBatchAnalysisResult(response.data);
+      setBatchAnalysisModalOpen(true);
+      
+      // Update files with results
+      const updatedFiles = files.map(file => {
+        const result = response.data.files.find((r: any) => r.file_id === file.file_id);
+        if (result && result.success) {
+          return {
+            ...file,
+            ocrText: result.ocr_text,
+            aiAnalysis: result.ai_analysis,
+            documentType: result.document_type,
+            ocrProcessing: false
+          };
+        }
+        return file;
+      });
+      
+      setFiles(updatedFiles);
+      onFilesUploaded?.(updatedFiles);
+      
+    } catch (error: any) {
+      alert(`Batch analysis failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setBatchProcessing(false);
+    }
+  };
+
+  const handleBatchAutoPopulation = (autoPopulationData: any) => {
+    if (onAiDataExtracted) {
+      onAiDataExtracted(autoPopulationData);
+    }
+    setBatchAnalysisModalOpen(false);
+  };
+
   return (
     <div className="space-y-4">
       {/* Upload Area */}
@@ -372,7 +475,7 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
         <input
           type="file"
           multiple={multiple}
-          accept=".pdf,.jpg,.jpeg,.png"
+          accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.docx,.doc"
           onChange={handleFileSelect}
           disabled={uploading}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
@@ -399,7 +502,7 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
             or drag and drop
           </div>
           <p className="text-xs text-gray-500">
-            PDF, JPG, PNG up to 10MB {multiple && '(max 10 files)'}
+            PDF, JPG, PNG, TIFF, DOCX up to 10MB {multiple && '(max 10 files)'}
           </p>
         </div>
         
@@ -437,9 +540,24 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
       {files.length > 0 && (
         <div className="border rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-2 border-b">
-            <h4 className="text-sm font-medium text-gray-900">
-              Uploaded Files ({files.length})
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium text-gray-900">
+                Uploaded Files ({files.length})
+              </h4>
+              {files.length >= 2 && (
+                <button
+                  onClick={runBatchAnalysis}
+                  disabled={batchProcessing}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg"
+                  title="Process all files together with cross-document validation and consolidated analysis"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  {batchProcessing ? 'Processing All Files...' : 'Smart Batch Analysis'}
+                </button>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-gray-200">
             {files.map((file) => (
@@ -450,9 +568,18 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
                       <svg className="h-6 w-6 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                       </svg>
-                    ) : (
+                    ) : file.mime_type?.includes('word') || file.mime_type?.includes('document') ? (
+                      <svg className="h-6 w-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5z" />
+                        <path d="M6 7h8v1H6V7zm0 2h8v1H6V9zm0 2h5v1H6v-1z" />
+                      </svg>
+                    ) : file.mime_type?.startsWith('image/') ? (
                       <svg className="h-6 w-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="h-6 w-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                       </svg>
                     )}
                   </div>
@@ -481,8 +608,12 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
                   <button
                     onClick={() => runOCR(file)}
                     disabled={file.ocrProcessing}
-                    className="text-indigo-600 hover:text-indigo-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 hover:text-indigo-800 transition-colors duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Extract text using Google Vision OCR"
                   >
+                    <svg className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
                     {file.ocrProcessing ? 'Processing...' : 'Run OCR'}
                   </button>
                   {file.ocrText && (
@@ -490,31 +621,61 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
                       <button
                         onClick={() => analyzeDocument(file)}
                         disabled={analyzingFiles.has(file.file_id)}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 hover:text-blue-800 transition-colors duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Analyze with AI to extract structured data"
                       >
-                        {analyzingFiles.has(file.file_id) ? 'Analyzing...' : 'Analyze Doc'}
+                        <svg className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        {analyzingFiles.has(file.file_id) ? 'Analyzing...' : 'Analyze'}
                       </button>
                       <button
                         onClick={() => viewOcrResults(file)}
-                        className="text-green-600 hover:text-green-800 text-sm font-medium"
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 hover:text-green-800 transition-colors duration-200 shadow-sm hover:shadow-md"
+                        title="View extracted text"
                       >
+                        <svg className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
                         View Text
                       </button>
                       {file.aiAnalysis && (
-                        <button
-                          onClick={() => viewAiAnalysis(file)}
-                          className="text-purple-600 hover:text-purple-800 text-sm font-medium"
-                        >
-                          View Analysis
-                        </button>
+                        <>
+                          <button
+                            onClick={() => viewAiAnalysis(file)}
+                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 hover:text-purple-800 transition-colors duration-200 shadow-sm hover:shadow-md"
+                            title="View AI analysis results"
+                          >
+                            <svg className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            View Analysis
+                          </button>
+                          {onAiDataExtracted && (
+                            <button
+                              onClick={() => onAiDataExtracted(file.aiAnalysis)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-orange-700 bg-orange-100 hover:bg-orange-200 hover:text-orange-800 transition-colors duration-200 shadow-sm hover:shadow-md"
+                              title="Auto-populate wizard fields from AI analysis"
+                            >
+                              <svg className="h-3.5 w-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                              </svg>
+                              Auto-populate
+                            </button>
+                          )}
+                        </>
                       )}
                     </>
                   )}
                   <button
                     onClick={() => removeFile(file.file_id)}
-                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    className="inline-flex items-center px-2 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 hover:text-red-800 transition-colors duration-200 shadow-sm hover:shadow-md"
+                    title="Remove file"
                   >
-                    Remove
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -546,6 +707,14 @@ export default function FileUpload({ reportId, onFilesUploaded, multiple = true 
         title={selectedAnalysis?.filename || 'AI Analysis'}
         analysis={selectedAnalysis?.analysis}
         documentType={selectedAnalysis?.documentType}
+      />
+
+      {/* Batch Analysis Modal */}
+      <BatchAnalysisModal
+        isOpen={batchAnalysisModalOpen}
+        onClose={() => setBatchAnalysisModalOpen(false)}
+        result={batchAnalysisResult}
+        onApplyAutoPopulation={handleBatchAutoPopulation}
       />
     </div>
   );

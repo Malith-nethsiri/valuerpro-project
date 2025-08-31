@@ -14,12 +14,23 @@ interface UserProfile {
   valuer_profile?: {
     id: string;
     titles?: string;
+    full_name?: string;
+    designation?: string;
     qualifications?: string[];
     panels?: string[];
     registration_no?: string;
+    membership_status?: string;
+    company_name?: string;
+    firm_address?: string;
     address?: string;
     phones?: string[];
+    contact_phones?: string[];
     email?: string;
+    contact_email?: string;
+    default_standards?: string;
+    indemnity_status?: string;
+    default_disclaimers?: string;
+    default_certificate?: string;
   };
 }
 
@@ -37,12 +48,22 @@ export default function ProfilePage() {
     full_name: '',
     email: '',
     titles: '',
+    professional_name: '',
+    designation: '',
     qualifications: '',
     panels: '',
     registration_no: '',
+    membership_status: '',
+    company_name: '',
+    firm_address: '',
     address: '',
     phones: '',
+    contact_phones: '',
     contact_email: '',
+    default_standards: '',
+    indemnity_status: '',
+    default_disclaimers: '',
+    default_certificate: '',
   });
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -67,12 +88,22 @@ export default function ProfilePage() {
         full_name: userData.full_name || '',
         email: userData.email || '',
         titles: userData.valuer_profile?.titles || '',
+        professional_name: userData.valuer_profile?.full_name || '',
+        designation: userData.valuer_profile?.designation || '',
         qualifications: userData.valuer_profile?.qualifications?.join(', ') || '',
         panels: userData.valuer_profile?.panels?.join(', ') || '',
         registration_no: userData.valuer_profile?.registration_no || '',
+        membership_status: userData.valuer_profile?.membership_status || '',
+        company_name: userData.valuer_profile?.company_name || '',
+        firm_address: userData.valuer_profile?.firm_address || '',
         address: userData.valuer_profile?.address || '',
         phones: userData.valuer_profile?.phones?.join(', ') || '',
-        contact_email: userData.valuer_profile?.email || '',
+        contact_phones: userData.valuer_profile?.contact_phones?.join(', ') || '',
+        contact_email: userData.valuer_profile?.contact_email || userData.valuer_profile?.email || '',
+        default_standards: userData.valuer_profile?.default_standards || '',
+        indemnity_status: userData.valuer_profile?.indemnity_status || '',
+        default_disclaimers: userData.valuer_profile?.default_disclaimers || '',
+        default_certificate: userData.valuer_profile?.default_certificate || '',
       });
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -149,15 +180,27 @@ export default function ProfilePage() {
       // Update or create valuer profile
       const valuerProfileData = {
         titles: formData.titles || null,
+        full_name: formData.professional_name || null,
+        designation: formData.designation || null,
         qualifications: formData.qualifications ? 
           formData.qualifications.split(',').map(q => q.trim()).filter(q => q) : [],
         panels: formData.panels ? 
           formData.panels.split(',').map(p => p.trim()).filter(p => p) : [],
         registration_no: formData.registration_no || null,
+        membership_status: formData.membership_status || null,
+        company_name: formData.company_name || null,
+        firm_address: formData.firm_address || null,
         address: formData.address || null,
         phones: formData.phones ? 
           formData.phones.split(',').map(p => p.trim()).filter(p => p) : [],
+        contact_phones: formData.contact_phones ? 
+          formData.contact_phones.split(',').map(p => p.trim()).filter(p => p) : [],
         email: formData.contact_email || null,
+        contact_email: formData.contact_email || null,
+        default_standards: formData.default_standards || null,
+        indemnity_status: formData.indemnity_status || null,
+        default_disclaimers: formData.default_disclaimers || null,
+        default_certificate: formData.default_certificate || null,
       };
 
       if (profile?.valuer_profile) {
@@ -193,12 +236,22 @@ export default function ProfilePage() {
         full_name: profile.full_name || '',
         email: profile.email || '',
         titles: profile.valuer_profile?.titles || '',
+        professional_name: profile.valuer_profile?.full_name || '',
+        designation: profile.valuer_profile?.designation || '',
         qualifications: profile.valuer_profile?.qualifications?.join(', ') || '',
         panels: profile.valuer_profile?.panels?.join(', ') || '',
         registration_no: profile.valuer_profile?.registration_no || '',
+        membership_status: profile.valuer_profile?.membership_status || '',
+        company_name: profile.valuer_profile?.company_name || '',
+        firm_address: profile.valuer_profile?.firm_address || '',
         address: profile.valuer_profile?.address || '',
         phones: profile.valuer_profile?.phones?.join(', ') || '',
-        contact_email: profile.valuer_profile?.email || '',
+        contact_phones: profile.valuer_profile?.contact_phones?.join(', ') || '',
+        contact_email: profile.valuer_profile?.contact_email || profile.valuer_profile?.email || '',
+        default_standards: profile.valuer_profile?.default_standards || '',
+        indemnity_status: profile.valuer_profile?.indemnity_status || '',
+        default_disclaimers: profile.valuer_profile?.default_disclaimers || '',
+        default_certificate: profile.valuer_profile?.default_certificate || '',
       });
     }
   };
@@ -383,6 +436,46 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
+                      Professional Name
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="professional_name"
+                        value={formData.professional_name}
+                        onChange={handleChange}
+                        placeholder="Full professional name for reports"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.full_name || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Professional Designation
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="designation"
+                        value={formData.designation}
+                        onChange={handleChange}
+                        placeholder="Chartered Valuer, FIVSL, etc."
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.designation || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
                       Qualifications
                     </label>
                     {isEditing ? (
@@ -446,6 +539,46 @@ export default function ProfilePage() {
                       </p>
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      IVSL Membership Status
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="membership_status"
+                        value={formData.membership_status}
+                        onChange={handleChange}
+                        placeholder="Full Member, Associate Member, etc."
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.membership_status || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Company/Firm Name
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="company_name"
+                        value={formData.company_name}
+                        onChange={handleChange}
+                        placeholder="ABC Valuations (Pvt) Ltd"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.company_name || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -457,7 +590,27 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Business Address
+                      Firm Address
+                    </label>
+                    {isEditing ? (
+                      <textarea
+                        name="firm_address"
+                        value={formData.firm_address}
+                        onChange={handleChange}
+                        rows={3}
+                        placeholder="Complete business/firm address"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.firm_address || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Personal Address
                     </label>
                     {isEditing ? (
                       <textarea
@@ -465,7 +618,7 @@ export default function ProfilePage() {
                         value={formData.address}
                         onChange={handleChange}
                         rows={3}
-                        placeholder="123 Main Street, City, Country"
+                        placeholder="Personal address"
                         className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       />
                     ) : (
@@ -477,7 +630,30 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Phone Numbers
+                      Business Phone Numbers
+                    </label>
+                    {isEditing ? (
+                      <>
+                        <input
+                          type="text"
+                          name="contact_phones"
+                          value={formData.contact_phones}
+                          onChange={handleChange}
+                          placeholder="+94 11 123 4567, +94 77 123 4567"
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Business contact numbers (separate with commas)</p>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.contact_phones?.join(', ') || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Personal Phone Numbers
                     </label>
                     {isEditing ? (
                       <>
@@ -486,10 +662,10 @@ export default function ProfilePage() {
                           name="phones"
                           value={formData.phones}
                           onChange={handleChange}
-                          placeholder="+94 11 123 4567"
+                          placeholder="+94 77 123 4567"
                           className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                         />
-                        <p className="text-xs text-gray-500 mt-1">Separate multiple numbers with commas</p>
+                        <p className="text-xs text-gray-500 mt-1">Personal contact numbers (separate with commas)</p>
                       </>
                     ) : (
                       <p className="mt-1 text-gray-900">
@@ -500,7 +676,7 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">
-                      Contact Email
+                      Business Contact Email
                     </label>
                     {isEditing ? (
                       <>
@@ -509,7 +685,7 @@ export default function ProfilePage() {
                           name="contact_email"
                           value={formData.contact_email}
                           onChange={handleChange}
-                          placeholder="contact@example.com"
+                          placeholder="contact@company.com"
                           className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
                             fieldErrors.contact_email ? 'border-red-500' : 'border-gray-300'
                           }`}
@@ -517,12 +693,112 @@ export default function ProfilePage() {
                         {fieldErrors.contact_email && (
                           <div className="text-red-500 text-xs mt-1">{fieldErrors.contact_email}</div>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">Optional business contact email</p>
+                        <p className="text-xs text-gray-500 mt-1">Professional business email</p>
                       </>
                     ) : (
                       <p className="mt-1 text-gray-900">
-                        {profile.valuer_profile?.email || 'Not specified'}
+                        {profile.valuer_profile?.contact_email || profile.valuer_profile?.email || 'Not specified'}
                       </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Professional Standards & Legal Templates */}
+              <div className="lg:col-span-2">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Professional Standards & Legal Templates
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Default Valuation Standards
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="default_standards"
+                        value={formData.default_standards}
+                        onChange={handleChange}
+                        placeholder="IVSL Standards, IVS, etc."
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.default_standards || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Professional Indemnity Status
+                    </label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        name="indemnity_status"
+                        value={formData.indemnity_status}
+                        onChange={handleChange}
+                        placeholder="Covered up to LKR X million"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <p className="mt-1 text-gray-900">
+                        {profile.valuer_profile?.indemnity_status || 'Not specified'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Default Disclaimers
+                    </label>
+                    {isEditing ? (
+                      <textarea
+                        name="default_disclaimers"
+                        value={formData.default_disclaimers}
+                        onChange={handleChange}
+                        rows={4}
+                        placeholder="Standard disclaimer text to use in all reports..."
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <div className="mt-1">
+                        {profile.valuer_profile?.default_disclaimers ? (
+                          <div className="text-gray-900 whitespace-pre-wrap text-sm bg-gray-50 p-3 rounded-md">
+                            {profile.valuer_profile.default_disclaimers}
+                          </div>
+                        ) : (
+                          <p className="text-gray-900">Not specified</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Default Certificate Text
+                    </label>
+                    {isEditing ? (
+                      <textarea
+                        name="default_certificate"
+                        value={formData.default_certificate}
+                        onChange={handleChange}
+                        rows={4}
+                        placeholder="Standard professional certificate text..."
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      />
+                    ) : (
+                      <div className="mt-1">
+                        {profile.valuer_profile?.default_certificate ? (
+                          <div className="text-gray-900 whitespace-pre-wrap text-sm bg-gray-50 p-3 rounded-md">
+                            {profile.valuer_profile.default_certificate}
+                          </div>
+                        ) : (
+                          <p className="text-gray-900">Not specified</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>

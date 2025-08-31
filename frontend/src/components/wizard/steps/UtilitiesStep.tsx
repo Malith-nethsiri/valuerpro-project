@@ -1,8 +1,13 @@
 import { useWizard } from '../WizardProvider';
+import { useState } from 'react';
+import { ocrAPI } from '@/lib/api';
+import { SparklesIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
 export const UtilitiesStep = () => {
   const { state, updateStepData } = useWizard();
   const utilities = state.data.utilities;
+  const [isExtractingUtilities, setIsExtractingUtilities] = useState(false);
+  const [extractionResults, setExtractionResults] = useState<any>(null);
 
   const handleInputChange = (field: string, value: any) => {
     updateStepData('utilities', { [field]: value });
@@ -19,6 +24,224 @@ export const UtilitiesStep = () => {
     return utilities[utility] || {};
   };
 
+  // AI-powered utilities extraction
+  const extractUtilitiesFromDocuments = async () => {
+    // Get uploaded files from the wizard state
+    const uploadedFiles = state.data.files || [];
+    
+    if (uploadedFiles.length === 0) {
+      alert('No documents uploaded. Please upload property documents first in the Files step.');
+      return;
+    }
+
+    setIsExtractingUtilities(true);
+    setExtractionResults(null);
+
+    try {
+      // Process each uploaded file for utilities extraction
+      const results = [];
+      
+      for (const file of uploadedFiles) {
+        if (!file.id) continue;
+        
+        try {
+          const utilitiesData = await ocrAPI.extractUtilities(file.id);
+          if (utilitiesData.utilities_data && !utilitiesData.utilities_data.error) {
+            results.push({
+              filename: file.filename || 'Unknown',
+              utilities: utilitiesData.utilities_data
+            });
+          }
+        } catch (error) {
+          console.error(`Failed to extract utilities from ${file.filename}:`, error);
+        }
+      }
+
+      if (results.length === 0) {
+        alert('No utilities information could be extracted from the uploaded documents. You may need to run OCR first or the documents may not contain utilities details.');
+        return;
+      }
+
+      setExtractionResults(results);
+
+      // Combine and populate utilities data from all successful extractions
+      const combinedUtilities = combineUtilitiesData(results);
+      populateUtilitiesFields(combinedUtilities);
+
+      alert(`Successfully extracted utilities information from ${results.length} document(s). Please review and adjust the populated fields as needed.`);
+
+    } catch (error: any) {
+      console.error('Utilities extraction failed:', error);
+      alert(`Failed to extract utilities information: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsExtractingUtilities(false);
+    }
+  };
+
+  // Combine utilities data from multiple documents
+  const combineUtilitiesData = (results: any[]) => {
+    const combined: any = {
+      electricity: {},
+      water: {},
+      telecom: {},
+      sewerage: {},
+      drainage: {},
+      other: {}
+    };
+
+    // Merge data from all documents, giving preference to more specific/complete data
+    results.forEach(result => {
+      const utilities = result.utilities;
+      
+      // Merge electricity data
+      if (utilities.electricity) {
+        Object.keys(utilities.electricity).forEach(key => {
+          if (utilities.electricity[key] && !combined.electricity[key]) {
+            combined.electricity[key] = utilities.electricity[key];
+          }
+        });
+      }
+
+      // Merge water data
+      if (utilities.water) {
+        Object.keys(utilities.water).forEach(key => {
+          if (utilities.water[key] && !combined.water[key]) {
+            combined.water[key] = utilities.water[key];
+          }
+        });
+      }
+
+      // Merge telecom data
+      if (utilities.telecom) {
+        Object.keys(utilities.telecom).forEach(key => {
+          if (utilities.telecom[key] !== null && utilities.telecom[key] !== undefined && !combined.telecom[key]) {
+            combined.telecom[key] = utilities.telecom[key];
+          }
+        });
+      }
+
+      // Merge sewerage data
+      if (utilities.sewerage) {
+        Object.keys(utilities.sewerage).forEach(key => {
+          if (utilities.sewerage[key] && !combined.sewerage[key]) {
+            combined.sewerage[key] = utilities.sewerage[key];
+          }
+        });
+      }
+
+      // Merge drainage data
+      if (utilities.drainage) {
+        Object.keys(utilities.drainage).forEach(key => {
+          if (utilities.drainage[key] && !combined.drainage[key]) {
+            combined.drainage[key] = utilities.drainage[key];
+          }
+        });
+      }
+
+      // Merge other utilities
+      if (utilities.other) {
+        Object.keys(utilities.other).forEach(key => {
+          if (utilities.other[key] !== null && utilities.other[key] !== undefined && combined.other[key] === undefined) {
+            combined.other[key] = utilities.other[key];
+          }
+        });
+      }
+    });
+
+    return combined;
+  };
+
+  // Populate utilities fields with AI-extracted data
+  const populateUtilitiesFields = (utilitiesData: any) => {
+    // Populate electricity data
+    if (utilitiesData.electricity) {
+      const electricityUpdate: any = {};
+      if (utilitiesData.electricity.available) electricityUpdate.available = utilitiesData.electricity.available;
+      if (utilitiesData.electricity.type) electricityUpdate.type = utilitiesData.electricity.type;
+      if (utilitiesData.electricity.connection_status) electricityUpdate.connection_status = utilitiesData.electricity.connection_status;
+      if (utilitiesData.electricity.provider || utilitiesData.electricity.account_number) {
+        electricityUpdate.notes = [
+          utilitiesData.electricity.provider,
+          utilitiesData.electricity.account_number ? `Account: ${utilitiesData.electricity.account_number}` : null,
+          utilitiesData.electricity.notes
+        ].filter(Boolean).join(' - ');
+      }
+      
+      if (Object.keys(electricityUpdate).length > 0) {
+        updateStepData('utilities', { electricity: { ...utilities.electricity, ...electricityUpdate } });
+      }
+    }
+
+    // Populate water data
+    if (utilitiesData.water) {
+      const waterUpdate: any = {};
+      if (utilitiesData.water.main_source) waterUpdate.main_source = utilitiesData.water.main_source;
+      if (utilitiesData.water.quality) waterUpdate.quality = utilitiesData.water.quality;
+      if (utilitiesData.water.reliability) waterUpdate.reliability = utilitiesData.water.reliability;
+      if (utilitiesData.water.provider || utilitiesData.water.notes) {
+        waterUpdate.notes = [utilitiesData.water.provider, utilitiesData.water.notes].filter(Boolean).join(' - ');
+      }
+      
+      if (Object.keys(waterUpdate).length > 0) {
+        updateStepData('utilities', { water: { ...utilities.water, ...waterUpdate } });
+      }
+    }
+
+    // Populate telecom data
+    if (utilitiesData.telecom) {
+      const telecomUpdate: any = {};
+      if (utilitiesData.telecom.fixed_line !== null) telecomUpdate.fixed_line = utilitiesData.telecom.fixed_line;
+      if (utilitiesData.telecom.mobile_coverage !== null) telecomUpdate.mobile_coverage = utilitiesData.telecom.mobile_coverage;
+      if (utilitiesData.telecom.broadband !== null) telecomUpdate.broadband = utilitiesData.telecom.broadband;
+      if (utilitiesData.telecom.fiber_optic !== null) telecomUpdate.fiber_optic = utilitiesData.telecom.fiber_optic;
+      if (utilitiesData.telecom.cable_tv !== null) telecomUpdate.cable_tv = utilitiesData.telecom.cable_tv;
+      if (utilitiesData.telecom.providers) telecomUpdate.providers = utilitiesData.telecom.providers;
+      if (utilitiesData.telecom.internet_speed) telecomUpdate.internet_speed = utilitiesData.telecom.internet_speed;
+      
+      if (Object.keys(telecomUpdate).length > 0) {
+        updateStepData('utilities', { telecom: { ...utilities.telecom, ...telecomUpdate } });
+      }
+    }
+
+    // Populate sewerage data
+    if (utilitiesData.sewerage) {
+      const sewerageUpdate: any = {};
+      if (utilitiesData.sewerage.type) sewerageUpdate.type = utilitiesData.sewerage.type;
+      if (utilitiesData.sewerage.condition) sewerageUpdate.condition = utilitiesData.sewerage.condition;
+      
+      if (Object.keys(sewerageUpdate).length > 0) {
+        updateStepData('utilities', { sewerage: { ...utilities.sewerage, ...sewerageUpdate } });
+      }
+    }
+
+    // Populate drainage data
+    if (utilitiesData.drainage) {
+      const drainageUpdate: any = {};
+      if (utilitiesData.drainage.surface) drainageUpdate.surface = utilitiesData.drainage.surface;
+      if (utilitiesData.drainage.storm_water) drainageUpdate.storm_water = utilitiesData.drainage.storm_water;
+      if (utilitiesData.drainage.notes) drainageUpdate.notes = utilitiesData.drainage.notes;
+      
+      if (Object.keys(drainageUpdate).length > 0) {
+        updateStepData('utilities', { drainage: { ...utilities.drainage, ...drainageUpdate } });
+      }
+    }
+
+    // Populate other utilities
+    if (utilitiesData.other) {
+      const otherUpdate: any = {};
+      if (utilitiesData.other.gas_connection !== null) otherUpdate.gas_connection = utilitiesData.other.gas_connection;
+      if (utilitiesData.other.garbage_collection !== null) otherUpdate.garbage_collection = utilitiesData.other.garbage_collection;
+      if (utilitiesData.other.street_lighting !== null) otherUpdate.street_lighting = utilitiesData.other.street_lighting;
+      if (utilitiesData.other.security_services !== null) otherUpdate.security_services = utilitiesData.other.security_services;
+      if (utilitiesData.other.postal_service !== null) otherUpdate.postal_service = utilitiesData.other.postal_service;
+      if (utilitiesData.other.fire_hydrant !== null) otherUpdate.fire_hydrant = utilitiesData.other.fire_hydrant;
+      
+      if (Object.keys(otherUpdate).length > 0) {
+        updateStepData('utilities', { other: { ...utilities.other, ...otherUpdate } });
+      }
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div>
@@ -28,13 +251,76 @@ export const UtilitiesStep = () => {
         <p className="text-sm text-gray-600 mb-6">
           Document all utility services available to the property including electricity, water, telecommunications, and drainage systems.
         </p>
+        
+        {/* AI Utilities Extraction */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <h4 className="text-md font-medium text-purple-900">
+              🤖 AI-Powered Utilities Detection
+            </h4>
+            <button
+              type="button"
+              onClick={extractUtilitiesFromDocuments}
+              disabled={isExtractingUtilities}
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md ${
+                isExtractingUtilities
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500'
+              }`}
+            >
+              {isExtractingUtilities ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : (
+                <SparklesIcon className="h-4 w-4 mr-2" />
+              )}
+              {isExtractingUtilities ? 'Analyzing Documents...' : 'Extract from Documents'}
+            </button>
+          </div>
+          
+          <p className="text-sm text-purple-700 mb-3">
+            Automatically extract utilities information from uploaded property documents using AI analysis. 
+            The system will analyze deeds, survey plans, and inspection reports to identify electricity connections, 
+            water sources, telecom services, and drainage systems.
+          </p>
+
+          {extractionResults && extractionResults.length > 0 && (
+            <div className="bg-white border border-purple-200 rounded-md p-3 mt-3">
+              <h5 className="text-sm font-semibold text-purple-900 mb-2">
+                📄 Extraction Results ({extractionResults.length} documents analyzed)
+              </h5>
+              <div className="space-y-2 text-xs">
+                {extractionResults.map((result: any, index: number) => (
+                  <div key={index} className="flex items-center">
+                    <DocumentTextIcon className="h-4 w-4 text-purple-500 mr-2" />
+                    <span className="text-purple-700">
+                      {result.filename} - Utilities data extracted
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-purple-600">
+                💡 Fields have been automatically populated. Please review and adjust as needed.
+              </div>
+            </div>
+          )}
+
+          <div className="mt-3 text-xs text-purple-600">
+            <strong>Smart Features:</strong>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              <li>Detects electricity connections and account numbers automatically</li>
+              <li>Identifies water sources (mains, wells, boreholes) from documents</li>
+              <li>Extracts telecom service providers and connection types</li>
+              <li>Analyzes sewerage and drainage system information</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* Electricity */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <h4 className="text-md font-medium text-yellow-900 mb-4">Electricity Supply</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Electricity Available
@@ -84,7 +370,7 @@ export const UtilitiesStep = () => {
             </select>
           </div>
 
-          <div className="md:col-span-2">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Electricity Provider & Notes
             </label>
@@ -97,18 +383,6 @@ export const UtilitiesStep = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Monthly Average Bill (Rs.)
-            </label>
-            <input
-              type="number"
-              value={getUtilityData('electricity').monthly_cost || ''}
-              onChange={(e) => handleUtilityChange('electricity', 'monthly_cost', parseFloat(e.target.value) || '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., 5000"
-            />
-          </div>
         </div>
       </div>
 

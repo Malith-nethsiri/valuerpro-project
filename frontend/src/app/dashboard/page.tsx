@@ -4,6 +4,15 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { reportsAPI } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { 
+  EyeIcon, 
+  PencilIcon, 
+  TrashIcon,
+  DocumentIcon,
+  PlusIcon,
+  UserCircleIcon,
+  ChevronDownIcon 
+} from '@heroicons/react/24/outline';
 
 interface Report {
   id: string;
@@ -19,6 +28,9 @@ export default function DashboardPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [generatingDocx, setGeneratingDocx] = useState<string | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -31,6 +43,18 @@ export default function DashboardPage() {
       loadData();
     }
   }, [user, authLoading, router]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdown) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openDropdown]);
 
   const loadData = async () => {
     try {
@@ -51,8 +75,52 @@ export default function DashboardPage() {
     router.push('/reports/create');
   };
 
-  const handleViewReport = (reportId: string) => {
-    router.push(`/reports/${reportId}`);
+  const handleViewReport = (reportId: string, format: 'pdf' | 'docx' = 'pdf') => {
+    if (format === 'pdf') {
+      handleGeneratePdf(reportId);
+    } else {
+      handleGenerateDocx(reportId);
+    }
+  };
+
+  const handleGeneratePdf = async (reportId: string) => {
+    try {
+      setGeneratingPdf(reportId);
+      const blob = await reportsAPI.generatePDF(reportId);
+      
+      // Create download URL and open in new tab
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      setError('Failed to generate PDF report. Please try again.');
+      console.error('PDF generation error:', error);
+    } finally {
+      setGeneratingPdf(null);
+    }
+  };
+
+  const handleGenerateDocx = async (reportId: string) => {
+    try {
+      setGeneratingDocx(reportId);
+      const blob = await reportsAPI.generateDOCX(reportId);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Report_${reportId.slice(0, 8)}.docx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      setError('Failed to generate DOCX report. Please try again.');
+      console.error('DOCX generation error:', error);
+    } finally {
+      setGeneratingDocx(null);
+    }
   };
 
   const handleEditReport = (reportId: string) => {
@@ -99,9 +167,10 @@ export default function DashboardPage() {
               </span>
               <button
                 onClick={() => router.push('/profile')}
-                className="text-indigo-600 hover:text-indigo-500 border border-indigo-600 px-3 py-1 rounded-md hover:bg-indigo-50"
+                className="text-indigo-600 hover:text-indigo-500 border border-indigo-600 px-3 py-1 rounded-md hover:bg-indigo-50 flex items-center space-x-1 transition-colors duration-200"
               >
-                Edit Profile
+                <UserCircleIcon className="h-4 w-4" />
+                <span>Edit Profile</span>
               </button>
               <button
                 onClick={handleLogout}
@@ -174,9 +243,10 @@ export default function DashboardPage() {
               </h3>
               <button
                 onClick={handleCreateReport}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center space-x-2 transition-colors duration-200 shadow-sm hover:shadow-md"
               >
-                Create New Report
+                <PlusIcon className="h-4 w-4" />
+                <span>Create New Report</span>
               </button>
             </div>
 
@@ -239,25 +309,72 @@ export default function DashboardPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(report.created_at).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button
-                            onClick={() => handleViewReport(report.id)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleEditReport(report.id)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteReport(report.id)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Delete
-                          </button>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-3">
+                            {/* View Dropdown */}
+                            <div className="relative">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenDropdown(openDropdown === report.id ? null : report.id);
+                                }}
+                                disabled={generatingPdf === report.id || generatingDocx === report.id}
+                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 hover:text-blue-800 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="View Report"
+                              >
+                                <EyeIcon className="h-3.5 w-3.5 mr-1" />
+                                {generatingPdf === report.id ? 'PDF...' : generatingDocx === report.id ? 'DOCX...' : 'View'}
+                                <ChevronDownIcon className="h-3 w-3 ml-1" />
+                              </button>
+                              
+                              {openDropdown === report.id && (
+                                <div 
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                                >
+                                  <button
+                                    onClick={() => {
+                                      handleViewReport(report.id, 'pdf');
+                                      setOpenDropdown(null);
+                                    }}
+                                    disabled={generatingPdf === report.id}
+                                    className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <DocumentIcon className="h-4 w-4 mr-3 text-red-600" />
+                                    View as PDF
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleViewReport(report.id, 'docx');
+                                      setOpenDropdown(null);
+                                    }}
+                                    disabled={generatingDocx === report.id}
+                                    className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <DocumentIcon className="h-4 w-4 mr-3 text-blue-600" />
+                                    Download DOCX
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => handleEditReport(report.id)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 hover:text-indigo-800 transition-all duration-200 shadow-sm hover:shadow-md"
+                              title="Edit Report"
+                            >
+                              <PencilIcon className="h-3.5 w-3.5 mr-1" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteReport(report.id)}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 hover:text-red-800 transition-all duration-200 shadow-sm hover:shadow-md"
+                              title="Delete Report"
+                            >
+                              <TrashIcon className="h-3.5 w-3.5 mr-1" />
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

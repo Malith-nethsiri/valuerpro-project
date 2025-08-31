@@ -12,18 +12,20 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     full_name: '',
-    title: '',
+    registration_no: '',
     qualifications: '',
-    panel_memberships: '',
-    business_address: '',
-    contact_numbers: '',
+    experience_years: '',
+    specialization: '',
+    firm_name: '',
+    designation: '',
+    contact_phone: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
@@ -156,19 +158,43 @@ export default function RegisterPage() {
             </div>
 
             {/* Professional Information */}
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                Title
-              </label>
-              <input
-                id="title"
-                name="title"
-                type="text"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Mr./Mrs./Dr./Prof."
-                value={formData.title}
-                onChange={handleChange}
-              />
+            <div className="mt-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Professional Information</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                This information helps us create your professional profile and ensures accurate valuation reports.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="registration_no" className="block text-sm font-medium text-gray-700">
+                  Registration Number
+                </label>
+                <input
+                  id="registration_no"
+                  name="registration_no"
+                  type="text"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="VSL12345 or RICS123456"
+                  value={formData.registration_no}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="designation" className="block text-sm font-medium text-gray-700">
+                  Designation
+                </label>
+                <input
+                  id="designation"
+                  name="designation"
+                  type="text"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="Senior Valuer, Principal Valuer"
+                  value={formData.designation}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
             <div>
@@ -180,55 +206,81 @@ export default function RegisterPage() {
                 name="qualifications"
                 type="text"
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="BSc (Hons) Estate Management, ARICS"
+                placeholder="AIVSL, BSc Surveying, RICS"
                 value={formData.qualifications}
                 onChange={handleChange}
               />
             </div>
 
-            <div>
-              <label htmlFor="panel_memberships" className="block text-sm font-medium text-gray-700">
-                Panel Memberships
-              </label>
-              <input
-                id="panel_memberships"
-                name="panel_memberships"
-                type="text"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="Approved Valuer Panel"
-                value={formData.panel_memberships}
-                onChange={handleChange}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">
+                  Years of Experience
+                </label>
+                <input
+                  id="experience_years"
+                  name="experience_years"
+                  type="number"
+                  min="0"
+                  max="50"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="10"
+                  value={formData.experience_years}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="specialization" className="block text-sm font-medium text-gray-700">
+                  Specialization
+                </label>
+                <select
+                  id="specialization"
+                  name="specialization"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  value={formData.specialization}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Specialization</option>
+                  <option value="residential">Residential Properties</option>
+                  <option value="commercial">Commercial Properties</option>
+                  <option value="industrial">Industrial Properties</option>
+                  <option value="agricultural">Agricultural Land</option>
+                  <option value="mixed">Mixed Use Properties</option>
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label htmlFor="business_address" className="block text-sm font-medium text-gray-700">
-                Business Address
-              </label>
-              <textarea
-                id="business_address"
-                name="business_address"
-                rows={3}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="123 Main Street, City, Country"
-                value={formData.business_address}
-                onChange={handleChange}
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="firm_name" className="block text-sm font-medium text-gray-700">
+                  Firm Name
+                </label>
+                <input
+                  id="firm_name"
+                  name="firm_name"
+                  type="text"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="ABC Valuation Services"
+                  value={formData.firm_name}
+                  onChange={handleChange}
+                />
+              </div>
 
-            <div>
-              <label htmlFor="contact_numbers" className="block text-sm font-medium text-gray-700">
-                Contact Numbers
-              </label>
-              <input
-                id="contact_numbers"
-                name="contact_numbers"
-                type="text"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                placeholder="+94 11 123 4567"
-                value={formData.contact_numbers}
-                onChange={handleChange}
-              />
+              <div>
+                <label htmlFor="contact_phone" className="block text-sm font-medium text-gray-700">
+                  Contact Phone
+                </label>
+                <input
+                  id="contact_phone"
+                  name="contact_phone"
+                  type="tel"
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="+94 11 123 4567"
+                  value={formData.contact_phone}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
           </div>
 

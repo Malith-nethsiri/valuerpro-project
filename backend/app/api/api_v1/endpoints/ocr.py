@@ -21,9 +21,12 @@ try:
     from google.cloud import vision
     import fitz  # PyMuPDF
     from PIL import Image
+    from docx import Document  # python-docx for DOCX files
     VISION_AVAILABLE = True
-except ImportError:
+    DOCX_AVAILABLE = True
+except ImportError as e:
     VISION_AVAILABLE = False
+    DOCX_AVAILABLE = False
 
 router = APIRouter()
 
@@ -144,6 +147,71 @@ def pdf_to_images_and_extract_text(pdf_path: str, client: vision.ImageAnnotatorC
         )
 
 
+def extract_text_from_docx(docx_path: str) -> List[OCRPageResult]:
+    """Extract text from DOCX file (no OCR needed)"""
+    try:
+        if not DOCX_AVAILABLE:
+            raise HTTPException(
+                status_code=400,
+                detail="DOCX processing not available. python-docx not installed."
+            )
+        
+        doc = Document(docx_path)
+        text_content = []
+        
+        # Extract all paragraphs
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                text_content.append(paragraph.text)
+        
+        # Extract text from tables
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    if cell.text.strip():
+                        text_content.append(cell.text)
+        
+        full_text = "\n".join(text_content)
+        return [OCRPageResult(page=1, text=full_text)]
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process DOCX: {str(e)}"
+        )
+
+
+def process_image_file(image_path: str, client: vision.ImageAnnotatorClient) -> List[OCRPageResult]:
+    """Process image file (JPG, PNG, TIFF) using Vision API"""
+    try:
+        # Handle TIFF files - convert to PNG if needed
+        file_ext = Path(image_path).suffix.lower()
+        if file_ext in ['.tiff', '.tif']:
+            # Convert TIFF to PNG for Vision API
+            with Image.open(image_path) as img:
+                # Convert to RGB if needed
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Convert to bytes
+                img_bytes = io.BytesIO()
+                img.save(img_bytes, format='PNG')
+                image_data = img_bytes.getvalue()
+        else:
+            # For JPG, PNG - read directly
+            with open(image_path, 'rb') as f:
+                image_data = f.read()
+        
+        text = extract_text_from_image(image_data, client)
+        return [OCRPageResult(page=1, text=text)]
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process image file: {str(e)}"
+        )
+
+
 def validate_file_access(file_path: str, current_user: User) -> str:
     """Validate that the file exists and user has access to it"""
     if not file_path:
@@ -163,10 +231,10 @@ def validate_file_access(file_path: str, current_user: User) -> str:
     
     # Validate file type
     file_ext = Path(abs_path).suffix.lower()
-    if file_ext not in ['.pdf', '.jpg', '.jpeg', '.png']:
+    if file_ext not in ['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.docx', '.doc']:
         raise HTTPException(
             status_code=400,
-            detail="Unsupported file type. Supported types: PDF, JPG, JPEG, PNG"
+            detail="Unsupported file type. Supported types: PDF, JPG, JPEG, PNG, TIFF, DOCX, DOC"
         )
     
     return abs_path
@@ -223,9 +291,6 @@ async def extract_text(
                 file_path=request.file_path or file_record.file_path
             )
     
-    # Initialize Vision client
-    vision_client = get_vision_client()
-    
     # Determine file type and process accordingly
     try:
         file_ext = Path(abs_file_path).suffix.lower()
@@ -234,16 +299,18 @@ async def extract_text(
     
     try:
         if file_ext == '.pdf':
-            # Process PDF
+            # Initialize Vision client for PDF processing
+            vision_client = get_vision_client()
             pages_text = pdf_to_images_and_extract_text(abs_file_path, vision_client)
             
-        else:
-            # Process image file
-            with open(abs_file_path, 'rb') as f:
-                image_data = f.read()
+        elif file_ext in ['.docx', '.doc']:
+            # Process DOCX/DOC files (direct text extraction, no OCR needed)
+            pages_text = extract_text_from_docx(abs_file_path)
             
-            text = extract_text_from_image(image_data, vision_client)
-            pages_text = [OCRPageResult(page=1, text=text)]
+        else:
+            # Process image files (JPG, PNG, TIFF)
+            vision_client = get_vision_client()
+            pages_text = process_image_file(abs_file_path, vision_client)
         
         # Combine all text - handle potential Unicode issues
         try:
@@ -429,3 +496,181 @@ async def analyze_document(
             status_code=500,
             detail=f"Document analysis failed: {str(e)}"
         )
+
+
+@router.post("/extract_utilities")
+async def extract_utilities_from_document(
+    request: OCRRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Extract utilities information from OCR text using AI"""
+    
+    # Get OCR text from file
+    ocr_text = None
+    file_record = None
+    
+    if request.file_id:
+        try:
+            file_record = db.query(FileModel).filter(
+                FileModel.id == UUID(str(request.file_id)),
+                FileModel.user_id == current_user.id
+            ).first()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid file_id format")
+    
+    # Get existing OCR result
+    if file_record:
+        ocr_result = db.query(OCRResult).filter(
+            OCRResult.file_id == file_record.id
+        ).first()
+        if not ocr_result:
+            raise HTTPException(status_code=404, detail="OCR result not found. Please run OCR first.")
+        
+        ocr_text = ocr_result.edited_text or ocr_result.raw_text
+    else:
+        raise HTTPException(status_code=400, detail="file_id is required for utilities extraction")
+    
+    if not ocr_text:
+        raise HTTPException(status_code=400, detail="No text available for utilities extraction")
+    
+    try:
+        # Import the utilities extraction function
+        from app.services.ai_extraction import extract_utilities_data
+        
+        # Extract utilities data
+        utilities_result = extract_utilities_data(ocr_text)
+        
+        return {
+            "file_id": str(file_record.id),
+            "utilities_data": utilities_result,
+            "ocr_text_length": len(ocr_text),
+            "extraction_timestamp": time.time(),
+            "extraction_type": "utilities"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Utilities extraction failed: {str(e)}"
+        )
+
+
+class BatchOCRRequest(BaseModel):
+    file_ids: List[UUID]
+    document_type: Optional[str] = None
+    
+    
+class BatchOCRResponse(BaseModel):
+    files_processed: int
+    total_files: int
+    results: List[Dict[str, Any]]
+    consolidated_data: Optional[Dict[str, Any]] = None
+    processing_time_seconds: float
+
+
+@router.post("/batch_extract_text", response_model=BatchOCRResponse)
+async def batch_extract_text(
+    request: BatchOCRRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Process multiple files with OCR and AI analysis simultaneously.
+    This provides more accurate results for property documents that span multiple pages/files.
+    """
+    start_time = time.time()
+    
+    if not request.file_ids:
+        raise HTTPException(status_code=400, detail="No file IDs provided")
+    
+    if len(request.file_ids) > 10:  # Limit batch size for performance
+        raise HTTPException(status_code=400, detail="Maximum 10 files per batch")
+    
+    # Verify all files exist and belong to the user
+    files = []
+    for file_id in request.file_ids:
+        file_record = db.query(FileModel).filter(
+            FileModel.id == file_id
+        ).first()
+        
+        if not file_record:
+            raise HTTPException(status_code=404, detail=f"File {file_id} not found")
+        
+        files.append(file_record)
+    
+    # Process each file with OCR
+    results = []
+    all_extracted_text = []
+    
+    for file_record in files:
+        try:
+            # Process individual file
+            if file_record.mime_type.startswith('image/'):
+                text = extract_text_from_image(file_record.path)
+            elif file_record.mime_type == 'application/pdf':
+                text = extract_text_from_pdf(file_record.path)
+            else:
+                continue
+                
+            if text:
+                # Get document type and AI analysis for individual file
+                doc_type = detect_document_type(text)
+                ai_data = process_document_with_ai(text, doc_type or "unknown")
+                
+                result = {
+                    "file_id": str(file_record.id),
+                    "filename": file_record.filename,
+                    "extracted_text": text,
+                    "document_type": doc_type,
+                    "ai_extracted_data": ai_data,
+                    "text_length": len(text)
+                }
+                
+                results.append(result)
+                all_extracted_text.append(text)
+                
+        except Exception as e:
+            # Add error info but continue processing other files
+            results.append({
+                "file_id": str(file_record.id),
+                "filename": file_record.filename,
+                "error": str(e),
+                "success": False
+            })
+    
+    # Consolidate data from all files for more accurate analysis
+    consolidated_data = None
+    if all_extracted_text and len(all_extracted_text) > 1:
+        try:
+            # Combine all text for comprehensive analysis
+            combined_text = "\n\n--- DOCUMENT SEPARATOR ---\n\n".join(all_extracted_text)
+            
+            # Detect overall document type from combined text
+            combined_doc_type = detect_document_type(combined_text)
+            
+            # Process combined text with AI for better accuracy
+            consolidated_ai_data = process_document_with_ai(
+                combined_text, 
+                combined_doc_type or "property_documents"
+            )
+            
+            consolidated_data = {
+                "document_type": combined_doc_type,
+                "ai_extracted_data": consolidated_ai_data,
+                "total_text_length": len(combined_text),
+                "files_analyzed": len(all_extracted_text)
+            }
+            
+        except Exception as e:
+            consolidated_data = {"error": f"Consolidation failed: {str(e)}"}
+    
+    processing_time = time.time() - start_time
+    
+    return BatchOCRResponse(
+        files_processed=len([r for r in results if "error" not in r]),
+        total_files=len(files),
+        results=results,
+        consolidated_data=consolidated_data,
+        processing_time_seconds=processing_time
+    )

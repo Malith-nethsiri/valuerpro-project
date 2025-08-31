@@ -68,6 +68,38 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+    
+    # Create valuer profile with professional information if provided
+    if any([user_in.registration_no, user_in.qualifications, user_in.experience_years,
+            user_in.specialization, user_in.firm_name, user_in.designation, user_in.contact_phone]):
+        
+        profile_data = {
+            "user_id": user.id,
+            "full_name": user_in.full_name,
+            "registration_no": user_in.registration_no,
+            "qualifications": [user_in.qualifications] if user_in.qualifications else None,
+            "designation": user_in.designation,
+            "company_name": user_in.firm_name,
+            "contact_phones": [user_in.contact_phone] if user_in.contact_phone else None,
+            "contact_email": user_in.email
+        }
+        
+        # Remove None values
+        profile_data = {k: v for k, v in profile_data.items() if v is not None}
+        
+        try:
+            profile = ValuerProfile(**profile_data)
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            
+            # Refresh user to include profile
+            db.refresh(user)
+        except Exception as e:
+            # If profile creation fails, log but don't fail registration
+            print(f"Profile creation failed: {e}")
+            db.rollback()
+    
     return user
 
 

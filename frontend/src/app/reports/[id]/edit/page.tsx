@@ -2,225 +2,253 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
-import { reportsAPI } from '@/lib/api';
+import { WizardProvider } from '@/components/wizard/WizardProvider';
+import { WizardLayout } from '@/components/wizard/WizardLayout';
+import { WizardInitializer } from '@/components/wizard/WizardInitializer';
+import { ReportInfoStep } from '@/components/wizard/steps/ReportInfoStep';
+import { IdentificationStep } from '@/components/wizard/steps/IdentificationStep';
+import { LocationStep } from '@/components/wizard/steps/LocationStep';
+import { SiteStep } from '@/components/wizard/steps/SiteStep';
+import { BuildingsStep } from '@/components/wizard/steps/BuildingsStep';
+import { UtilitiesStep } from '@/components/wizard/steps/UtilitiesStep';
+import { PlanningStep } from '@/components/wizard/steps/PlanningStep';
+import { LocalityStep } from '@/components/wizard/steps/LocalityStep';
+import { ValuationStep } from '@/components/wizard/steps/ValuationStep';
+import { LegalStep } from '@/components/wizard/steps/LegalStep';
+import { AppendicesStep } from '@/components/wizard/steps/AppendicesStep';
+import { ReviewStep } from '@/components/wizard/steps/ReviewStep';
+import { useAuth } from '@/lib/auth';
 
-interface Report {
-  id: string;
-  title: string;
-  status: string;
-  property_address?: string;
-  reference_number?: string;
-  created_at: string;
-  updated_at: string;
-  data?: any;
-}
+const wizardSteps = [
+  {
+    id: 'report-info',
+    title: 'Report Info',
+    description: 'Purpose, client, dates, reference',
+    completed: false,
+    current: true,
+  },
+  {
+    id: 'identification',
+    title: 'Identification & Title',
+    description: 'Lot, plan, surveyor, boundaries',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'location',
+    title: 'Location & Access',
+    description: 'Address, coordinates, directions',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'site',
+    title: 'Site Description',
+    description: 'Shape, soil, features, accessibility',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'buildings',
+    title: 'Buildings',
+    description: 'Type, area, materials, condition',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'utilities',
+    title: 'Utilities',
+    description: 'Electricity, water, telecom, drainage',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'planning',
+    title: 'Planning/Zoning',
+    description: 'Zoning, restrictions, easements',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'locality',
+    title: 'Locality',
+    description: 'Market context, neighborhood',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'valuation',
+    title: 'Valuation',
+    description: 'Rates, calculations, values',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'legal',
+    title: 'Disclaimers',
+    description: 'Legal text, certificates',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'appendices',
+    title: 'Appendices',
+    description: 'Maps, photos, documents',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'review',
+    title: 'Review & Generate',
+    description: 'Final review and export',
+    completed: false,
+    current: false,
+  },
+];
 
 export default function EditReportPage() {
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
-  const reportId = params.id as string;
+  const [isLoading, setIsLoading] = useState(false);
+  const [steps, setSteps] = useState(wizardSteps);
+  const [currentStep, setCurrentStep] = useState(0);
   
-  const [report, setReport] = useState<Report | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    property_address: '',
-    reference_number: '',
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const reportId = params?.id as string;
 
+  // Handle authentication redirect
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!user && !authLoading) {
       router.push('/auth/login');
-      return;
     }
+  }, [user, authLoading, router]);
 
-    loadReport();
-  }, [reportId, router]);
+  const updateStepCompletion = (stepIndex: number, completed: boolean) => {
+    setSteps(prev => prev.map((step, index) => ({
+      ...step,
+      completed: index < stepIndex || completed,
+      current: index === stepIndex
+    })));
+  };
 
-  const loadReport = async () => {
+  const handleStepClick = (stepIndex: number) => {
+    // Allow navigation to completed steps or the next step
+    if (stepIndex <= currentStep + 1) {
+      setCurrentStep(stepIndex);
+      updateStepCompletion(stepIndex, false);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < steps.length - 1) {
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      updateStepCompletion(nextStep, false);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      const prevStep = currentStep - 1;
+      setCurrentStep(prevStep);
+      updateStepCompletion(prevStep, false);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsLoading(true);
     try {
-      const reportData = await reportsAPI.get(reportId);
-      setReport(reportData);
-      setFormData({
-        title: reportData.title || '',
-        property_address: reportData.property_address || '',
-        reference_number: reportData.reference_number || '',
-      });
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load report');
-      if (err.response?.status === 401) {
-        localStorage.removeItem('access_token');
-        router.push('/auth/login');
-      }
+      // The save functionality is handled by the WizardProvider
+      console.log('Step data saved automatically');
+      
+      // Mark current step as completed
+      updateStepCompletion(currentStep, true);
+    } catch (error) {
+      console.error('Error saving data:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const canGoNext = () => {
+    // Add validation logic here based on current step
+    return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setError('');
+  const canGoPrevious = () => {
+    return currentStep > 0;
+  };
 
-    try {
-      const updatedData = {
-        ...formData,
-        data: report?.data, // Preserve existing data
-      };
-
-      await reportsAPI.update(reportId, updatedData);
-      router.push(`/reports/${reportId}`);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update report');
-    } finally {
-      setSaving(false);
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 0:
+        return <ReportInfoStep />;
+      case 1:
+        return <IdentificationStep />;
+      case 2:
+        return <LocationStep />;
+      case 3:
+        return <SiteStep />;
+      case 4:
+        return <BuildingsStep />;
+      case 5:
+        return <UtilitiesStep />;
+      case 6:
+        return <PlanningStep />;
+      case 7:
+        return <LocalityStep />;
+      case 8:
+        return <ValuationStep />;
+      case 9:
+        return <LegalStep />;
+      case 10:
+        return <AppendicesStep />;
+      case 11:
+        return <ReviewStep />;
+      default:
+        return <ReportInfoStep />;
     }
   };
 
-  if (loading) {
+  if (!user && !authLoading) {
+    return null;
+  }
+
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading report...</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
 
-  if (error && !report) {
+  if (!reportId) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-6">
-              <div>
-                <Link href="/dashboard" className="text-indigo-600 hover:text-indigo-500">
-                  ← Back to Dashboard
-                </Link>
-                <h1 className="text-2xl font-bold text-gray-900 mt-2">Report Not Found</h1>
-              </div>
-            </div>
-          </div>
-        </header>
-        <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        </main>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600">Invalid report ID</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <Link href={`/reports/${reportId}`} className="text-indigo-600 hover:text-indigo-500">
-                ← Back to Report
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900 mt-2">Edit Report</h1>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Information */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                Basic Information
-              </h3>
-              
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                    Report Title *
-                  </label>
-                  <input
-                    type="text"
-                    name="title"
-                    id="title"
-                    required
-                    value={formData.title}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Valuation Report"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="reference_number" className="block text-sm font-medium text-gray-700">
-                    Reference Number
-                  </label>
-                  <input
-                    type="text"
-                    name="reference_number"
-                    id="reference_number"
-                    value={formData.reference_number}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="VR-2024-001"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label htmlFor="property_address" className="block text-sm font-medium text-gray-700">
-                    Property Address
-                  </label>
-                  <textarea
-                    name="property_address"
-                    id="property_address"
-                    rows={3}
-                    value={formData.property_address}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Enter the complete property address..."
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Error Display */}
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end space-x-3">
-            <Link
-              href={`/reports/${reportId}`}
-              className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={saving || !formData.title}
-              className="bg-indigo-600 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving...' : 'Update Report'}
-            </button>
-          </div>
-        </form>
-      </main>
-    </div>
+    <WizardProvider editMode={true} reportId={reportId}>
+      <WizardInitializer>
+        <WizardLayout
+          steps={steps}
+          currentStep={currentStep}
+          onStepClick={handleStepClick}
+          onNext={handleNext}
+          onPrevious={handlePrevious}
+          onSave={handleSave}
+          canGoNext={canGoNext()}
+          canGoPrevious={canGoPrevious()}
+          isLoading={isLoading}
+          saveLabel={currentStep === steps.length - 1 ? 'Update Report' : 'Save & Continue'}
+          editMode={true}
+        >
+          {renderCurrentStep()}
+        </WizardLayout>
+      </WizardInitializer>
+    </WizardProvider>
   );
 }

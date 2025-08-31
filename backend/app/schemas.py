@@ -28,12 +28,23 @@ class UserBase(BaseModel):
 
 class ValuerProfileBase(BaseModel):
     titles: Optional[str] = None
+    full_name: Optional[str] = None
+    designation: Optional[str] = None
     qualifications: Optional[List[str]] = None
     panels: Optional[List[str]] = None
     registration_no: Optional[str] = None
+    membership_status: Optional[str] = None
+    company_name: Optional[str] = None
+    firm_address: Optional[str] = None
     address: Optional[str] = None
     phones: Optional[List[str]] = None
+    contact_phones: Optional[List[str]] = None
     email: Optional[str] = None
+    contact_email: Optional[str] = None
+    default_standards: Optional[str] = None
+    indemnity_status: Optional[str] = None
+    default_disclaimers: Optional[str] = None
+    default_certificate: Optional[str] = None
 
 
 class ValuerProfileCreate(ValuerProfileBase):
@@ -55,6 +66,15 @@ class ValuerProfile(ValuerProfileBase):
 
 class UserCreate(UserBase):
     password: str
+    
+    # Professional information fields for registration
+    registration_no: Optional[str] = None
+    qualifications: Optional[str] = None  # e.g., "AIVSL, BSc Surveying"
+    experience_years: Optional[int] = None
+    specialization: Optional[str] = None  # e.g., "residential", "commercial", "industrial"
+    firm_name: Optional[str] = None
+    designation: Optional[str] = None  # e.g., "Senior Valuer", "Principal Valuer"
+    contact_phone: Optional[str] = None
     
     @field_validator('password')
     @classmethod

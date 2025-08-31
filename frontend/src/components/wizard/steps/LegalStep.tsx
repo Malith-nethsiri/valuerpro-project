@@ -1,8 +1,33 @@
 import { useWizard } from '../WizardProvider';
+import { useAuth } from '@/lib/auth';
+import { useEffect } from 'react';
 
 export const LegalStep = () => {
   const { state, updateStepData } = useWizard();
+  const { user } = useAuth();
   const legal = state.data.legal;
+  const profile = user?.valuer_profile;
+
+  // Auto-populate from profile on component mount
+  useEffect(() => {
+    if (profile && !legal.valuer_name) {
+      // Pre-fill common fields from valuer profile
+      updateStepData('legal', {
+        valuer_name: profile.full_name,
+        designation: profile.designation,
+        company_name: profile.company_name,
+        valuation_standards: profile.default_standards,
+        indemnity_insurance: profile.indemnity_status,
+        membership_status: profile.membership_status,
+        registration_number: profile.registration_no,
+        firm_address: profile.firm_address,
+        contact_phones: profile.contact_phones?.join(', '),
+        contact_email: profile.contact_email,
+        disclaimers: profile.default_disclaimers || legal.disclaimers,
+        certificate: profile.default_certificate || legal.certificate
+      });
+    }
+  }, [profile]);
 
   const handleInputChange = (field: string, value: any) => {
     updateStepData('legal', { [field]: value });
@@ -122,14 +147,28 @@ export const LegalStep = () => {
         <div className="mb-4 flex justify-between items-center">
           <label className="block text-sm font-medium text-gray-700">
             Standard Disclaimers
+            {profile?.default_disclaimers && (
+              <span className="ml-2 text-xs text-yellow-600">✓ Using profile template</span>
+            )}
           </label>
-          <button
-            type="button"
-            onClick={() => handleInputChange('disclaimers', defaultDisclaimers)}
-            className="px-3 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
-          >
-            Load Standard Text
-          </button>
+          <div className="space-x-2">
+            <button
+              type="button"
+              onClick={() => handleInputChange('disclaimers', defaultDisclaimers)}
+              className="px-3 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            >
+              Load Standard Text
+            </button>
+            {profile?.default_disclaimers && (
+              <button
+                type="button"
+                onClick={() => handleInputChange('disclaimers', profile.default_disclaimers)}
+                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Use Profile Template
+              </button>
+            )}
+          </div>
         </div>
         
         <textarea
@@ -148,14 +187,28 @@ export const LegalStep = () => {
         <div className="mb-4 flex justify-between items-center">
           <label className="block text-sm font-medium text-gray-700">
             Professional Certificate Statement
+            {profile?.default_certificate && (
+              <span className="ml-2 text-xs text-green-600">✓ Using profile template</span>
+            )}
           </label>
-          <button
-            type="button"
-            onClick={() => handleInputChange('certificate', defaultCertificate)}
-            className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            Load Standard Text
-          </button>
+          <div className="space-x-2">
+            <button
+              type="button"
+              onClick={() => handleInputChange('certificate', defaultCertificate)}
+              className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Load Standard Text
+            </button>
+            {profile?.default_certificate && (
+              <button
+                type="button"
+                onClick={() => handleInputChange('certificate', profile.default_certificate)}
+                className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Use Profile Template
+              </button>
+            )}
+          </div>
         </div>
         
         <textarea
@@ -167,59 +220,48 @@ export const LegalStep = () => {
         />
       </div>
 
-      {/* Compliance Information */}
+      {/* Professional Compliance - Auto-filled from Profile */}
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
         <h4 className="text-md font-medium text-purple-900 mb-4">Professional Compliance</h4>
+        <p className="text-sm text-purple-700 mb-4">
+          ✓ This information is automatically filled from your valuer profile.
+        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-75">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Valuation Standards Applied
             </label>
-            <select
-              value={legal.valuation_standards || ''}
-              onChange={(e) => handleInputChange('valuation_standards', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select standards...</option>
-              <option value="ivsl">Institute of Valuers of Sri Lanka Standards</option>
-              <option value="ivs">International Valuation Standards (IVS)</option>
-              <option value="ivsl_ivs">IVSL & IVS Standards</option>
-              <option value="other">Other Standards</option>
-            </select>
+            <input
+              type="text"
+              value={legal.valuation_standards || 'From profile'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              readOnly
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Professional Indemnity Insurance
             </label>
-            <select
-              value={legal.indemnity_insurance || ''}
-              onChange={(e) => handleInputChange('indemnity_insurance', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select status...</option>
-              <option value="covered">Covered by Professional Indemnity Insurance</option>
-              <option value="not_covered">Not Covered</option>
-              <option value="not_applicable">Not Applicable</option>
-            </select>
+            <input
+              type="text"
+              value={legal.indemnity_insurance || 'From profile'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              readOnly
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               IVSL Membership Status
             </label>
-            <select
-              value={legal.membership_status || ''}
-              onChange={(e) => handleInputChange('membership_status', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select status...</option>
-              <option value="fellow">Fellow Member (FIVSL)</option>
-              <option value="associate">Associate Member (AIVSL)</option>
-              <option value="probationer">Probationer Member</option>
-              <option value="other">Other Professional Body</option>
-            </select>
+            <input
+              type="text"
+              value={legal.membership_status || 'From profile'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              readOnly
+            />
           </div>
 
           <div>
@@ -228,20 +270,22 @@ export const LegalStep = () => {
             </label>
             <input
               type="text"
-              value={legal.registration_number || ''}
-              onChange={(e) => handleInputChange('registration_number', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Professional registration/membership number"
+              value={legal.registration_number || 'From profile'}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              readOnly
             />
           </div>
         </div>
       </div>
 
-      {/* Signature Section */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-gray-900 mb-4">Signature & Authentication</h4>
+      {/* Professional Information - Auto-filled from Profile */}
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <h4 className="text-md font-medium text-green-900 mb-4">Professional Information</h4>
+        <p className="text-sm text-green-700 mb-4">
+          ✓ This information is automatically filled from your valuer profile. Update your profile to change these details.
+        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-75">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Valuer's Full Name
@@ -249,9 +293,9 @@ export const LegalStep = () => {
             <input
               type="text"
               value={legal.valuer_name || ''}
-              onChange={(e) => handleInputChange('valuer_name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Full name of the valuer"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              placeholder="Automatically filled from profile"
+              readOnly
             />
           </div>
 
@@ -262,9 +306,9 @@ export const LegalStep = () => {
             <input
               type="text"
               value={legal.designation || ''}
-              onChange={(e) => handleInputChange('designation', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., Chartered Valuer, FIVSL"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              placeholder="Automatically filled from profile"
+              readOnly
             />
           </div>
 
@@ -275,9 +319,9 @@ export const LegalStep = () => {
             <input
               type="text"
               value={legal.company_name || ''}
-              onChange={(e) => handleInputChange('company_name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Valuation firm or company name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              placeholder="Automatically filled from profile"
+              readOnly
             />
           </div>
 
@@ -287,68 +331,44 @@ export const LegalStep = () => {
             </label>
             <input
               type="date"
-              value={legal.report_date ? legal.report_date.split('T')[0] : ''}
+              value={legal.report_date ? legal.report_date.split('T')[0] : new Date().toISOString().split('T')[0]}
               onChange={(e) => handleInputChange('report_date', e.target.value ? new Date(e.target.value).toISOString() : '')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
         </div>
-
-        <div className="mt-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Digital Signature Upload
-          </label>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <div className="text-gray-400 mb-2">
-              <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            <p className="text-sm text-gray-600">
-              Upload digital signature or company stamp
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Supported formats: PNG, JPG, PDF (Max 2MB)
-            </p>
-            <button
-              type="button"
-              className="mt-2 px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
-            >
-              Choose File
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Report Footer */}
+      {/* Report Footer - Auto-filled from Profile */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h4 className="text-md font-medium text-blue-900 mb-4">Report Footer Information</h4>
+        <p className="text-sm text-blue-700 mb-4">
+          ✓ Firm address and contact details are automatically filled from your valuer profile.
+        </p>
         
         <div className="space-y-4">
-          <div>
+          <div className="opacity-75">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Valuation Firm Address
             </label>
             <textarea
-              value={legal.firm_address || ''}
-              onChange={(e) => handleInputChange('firm_address', e.target.value)}
+              value={legal.firm_address || 'From profile'}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Complete address of the valuation firm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+              readOnly
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 opacity-75">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Contact Phone Numbers
               </label>
               <input
                 type="text"
-                value={legal.contact_phones || ''}
-                onChange={(e) => handleInputChange('contact_phones', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., +94 11 2345678, +94 77 1234567"
+                value={legal.contact_phones || 'From profile'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+                readOnly
               />
             </div>
 
@@ -358,10 +378,9 @@ export const LegalStep = () => {
               </label>
               <input
                 type="email"
-                value={legal.contact_email || ''}
-                onChange={(e) => handleInputChange('contact_email', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="professional.email@valuers.lk"
+                value={legal.contact_email || 'From profile'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-600"
+                readOnly
               />
             </div>
           </div>

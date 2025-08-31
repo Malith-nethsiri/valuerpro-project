@@ -3,13 +3,30 @@
 export interface ValuerProfile {
   id: string;
   user_id: string;
+  // Basic professional details
   titles?: string;
+  full_name?: string;
+  designation?: string;
   qualifications?: string[];
   panels?: string[];
+  // Registration & Membership
   registration_no?: string;
+  membership_status?: string;
+  // Company Information
+  company_name?: string;
+  firm_address?: string;
+  // Contact information
   address?: string;
   phones?: string[];
+  contact_phones?: string[];
   email?: string;
+  contact_email?: string;
+  // Professional Standards & Insurance
+  default_standards?: string;
+  indemnity_status?: string;
+  // Default Legal Content (to reuse across reports)
+  default_disclaimers?: string;
+  default_certificate?: string;
   created_at: string;
   updated_at: string;
 }
@@ -372,13 +389,30 @@ export interface RegisterFormData {
 }
 
 export interface ValuerProfileFormData {
+  // Basic professional details
   titles?: string;
+  full_name?: string;
+  designation?: string;
   qualifications?: string[];
   panels?: string[];
+  // Registration & Membership
   registration_no?: string;
+  membership_status?: string;
+  // Company Information
+  company_name?: string;
+  firm_address?: string;
+  // Contact information
   address?: string;
   phones?: string[];
+  contact_phones?: string[];
   email?: string;
+  contact_email?: string;
+  // Professional Standards & Insurance
+  default_standards?: string;
+  indemnity_status?: string;
+  // Default Legal Content (to reuse across reports)
+  default_disclaimers?: string;
+  default_certificate?: string;
 }
 
 export interface ReportWizardData {
@@ -486,7 +520,6 @@ export interface ReportWizardData {
       type?: string;
       connection_status?: string;
       notes?: string;
-      monthly_cost?: number;
     };
     water?: {
       main_source?: string;

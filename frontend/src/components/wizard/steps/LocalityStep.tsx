@@ -1,8 +1,14 @@
 import { useWizard } from '../WizardProvider';
+import { useState } from 'react';
+import { mapsAPI } from '@/lib/api';
+import { MapPinIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 export const LocalityStep = () => {
   const { state, updateStepData } = useWizard();
   const locality = state.data.locality;
+  const location = state.data.location;
+  const [amenitiesLoading, setAmenitiesLoading] = useState(false);
+  const [amenitiesData, setAmenitiesData] = useState<any>(null);
 
   const handleInputChange = (field: string, value: any) => {
     updateStepData('locality', { [field]: value });
@@ -14,6 +20,103 @@ export const LocalityStep = () => {
       ? amenities.filter((a: string) => a !== amenity)
       : [...amenities, amenity];
     updateStepData('locality', { nearby_amenities: updatedAmenities });
+  };
+
+  const detectNearbyAmenities = async () => {
+    if (!location?.latitude || !location?.longitude) {
+      alert('Property coordinates are required. Please complete the Location step first.');
+      return;
+    }
+
+    setAmenitiesLoading(true);
+    try {
+      const response = await mapsAPI.findNearbyAmenities(
+        location.latitude,
+        location.longitude,
+        5000 // 5km radius
+      );
+
+      setAmenitiesData(response);
+
+      // Auto-populate distance fields based on API results
+      const amenities = response.amenities || {};
+      
+      // Find nearest school
+      if (amenities.schools?.places?.length > 0) {
+        const nearestSchool = amenities.schools.places[0];
+        handleInputChange('distance_to_school', nearestSchool.distance_km);
+      }
+
+      // Find nearest hospital
+      if (amenities.hospitals?.places?.length > 0) {
+        const nearestHospital = amenities.hospitals.places[0];
+        handleInputChange('distance_to_hospital', nearestHospital.distance_km);
+      }
+
+      // Find nearest shopping center/supermarket
+      const shoppingPlaces = [
+        ...(amenities.supermarkets?.places || []),
+      ];
+      if (shoppingPlaces.length > 0) {
+        const nearestShopping = shoppingPlaces.sort((a, b) => a.distance_km - b.distance_km)[0];
+        handleInputChange('distance_to_shopping', nearestShopping.distance_km);
+      }
+
+      // Auto-select amenities in checklist based on findings
+      const foundAmenities: string[] = [];
+      
+      if (amenities.schools?.places?.length > 0) {
+        foundAmenities.push('Schools (Primary)', 'Schools (Secondary)');
+      }
+      if (amenities.hospitals?.places?.length > 0) {
+        foundAmenities.push('Hospitals/Medical Centers');
+      }
+      if (amenities.banks?.places?.length > 0) {
+        foundAmenities.push('Banks/Financial Services');
+      }
+      if (amenities.supermarkets?.places?.length > 0) {
+        foundAmenities.push('Markets/Supermarkets');
+      }
+      if (amenities.pharmacies?.places?.length > 0) {
+        foundAmenities.push('Markets/Supermarkets'); // Pharmacies often found in shopping areas
+      }
+      if (amenities.restaurants?.places?.length > 0) {
+        foundAmenities.push('Restaurants/Hotels');
+      }
+      if (amenities.places_of_worship?.places?.length > 0) {
+        foundAmenities.push('Religious Places');
+      }
+      if (amenities.train_stations?.places?.length > 0) {
+        foundAmenities.push('Railway Station');
+      }
+      if (amenities.bus_stations?.places?.length > 0) {
+        foundAmenities.push('Public Transport Hub');
+      }
+
+      // Merge with existing amenities
+      const existingAmenities = locality.nearby_amenities || [];
+      const updatedAmenities = [...new Set([...existingAmenities, ...foundAmenities])];
+      updateStepData('locality', { nearby_amenities: updatedAmenities });
+
+      // Set overall amenity rating based on findings
+      const totalAmenityTypes = Object.keys(amenities).length;
+      const amenitiesWithPlaces = Object.values(amenities).filter((category: any) => 
+        category.places && category.places.length > 0
+      ).length;
+
+      let rating = 'fair';
+      if (amenitiesWithPlaces >= 8) rating = 'excellent';
+      else if (amenitiesWithPlaces >= 6) rating = 'very_good';
+      else if (amenitiesWithPlaces >= 4) rating = 'good';
+      
+      handleInputChange('amenity_rating', rating);
+
+    } catch (error) {
+      console.error('Failed to detect nearby amenities:', error);
+      alert('Failed to detect nearby amenities. Please check your internet connection and try again.');
+    } finally {
+      setAmenitiesLoading(false);
+    }
   };
 
   const nearbyAmenityOptions = [
@@ -151,7 +254,33 @@ export const LocalityStep = () => {
 
       {/* Nearby Amenities */}
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-green-900 mb-4">Nearby Amenities & Services</h4>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-md font-medium text-green-900">Nearby Amenities & Services</h4>
+          <button
+            type="button"
+            onClick={detectNearbyAmenities}
+            disabled={amenitiesLoading || !location?.latitude || !location?.longitude}
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {amenitiesLoading ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            ) : (
+              <MagnifyingGlassIcon className="h-4 w-4 mr-2" />
+            )}
+            {amenitiesLoading ? 'Detecting...' : 'Auto-Detect Amenities'}
+          </button>
+        </div>
+
+        {!location?.latitude || !location?.longitude ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+            <div className="flex">
+              <MapPinIcon className="h-5 w-5 text-yellow-400 mr-2" />
+              <p className="text-sm text-yellow-700">
+                Complete the Location step first to enable automatic amenity detection.
+              </p>
+            </div>
+          </div>
+        ) : null}
         
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -171,6 +300,44 @@ export const LocalityStep = () => {
             ))}
           </div>
         </div>
+
+        {/* Amenities Detection Results */}
+        {amenitiesData && (
+          <div className="mb-6 bg-white border border-gray-200 rounded-lg p-4">
+            <h5 className="text-sm font-semibold text-gray-900 mb-3">🏢 Detected Amenities (5km radius)</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+              {Object.entries(amenitiesData.amenities || {}).map(([category, data]: [string, any]) => (
+                data.places && data.places.length > 0 && (
+                  <div key={category} className="bg-gray-50 rounded p-3">
+                    <div className="font-medium text-gray-900 mb-2 capitalize">
+                      {category.replace('_', ' ')} ({data.count})
+                    </div>
+                    <div className="space-y-1">
+                      {data.places.slice(0, 3).map((place: any, idx: number) => (
+                        <div key={idx} className="text-gray-600">
+                          <div className="font-medium truncate" title={place.name}>
+                            {place.name}
+                          </div>
+                          <div className="text-gray-500">
+                            {place.distance_km}km • {place.vicinity}
+                          </div>
+                        </div>
+                      ))}
+                      {data.places.length > 3 && (
+                        <div className="text-gray-500 text-xs">
+                          +{data.places.length - 3} more places
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              ))}
+            </div>
+            <div className="mt-3 text-xs text-gray-500">
+              📍 Searched within {amenitiesData.radius}m radius of property location
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>

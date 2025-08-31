@@ -210,6 +210,11 @@ export const reportsAPI = {
     const response = await apiClient.get(`/reports/${id}`);
     return response.data;
   },
+
+  getById: async (id: string): Promise<Report> => {
+    const response = await apiClient.get(`/reports/${id}`);
+    return response.data;
+  },
   
   update: async (id: string, reportData: any): Promise<Report> => {
     const response = await apiClient.put(`/reports/${id}`, reportData);
@@ -286,6 +291,13 @@ export const ocrAPI = {
     });
     return response.data;
   },
+  
+  extractUtilities: async (fileId: string) => {
+    const response = await apiClient.post('/ocr/extract_utilities', {
+      file_id: fileId
+    });
+    return response.data;
+  },
 };
 
 // Maps API functions
@@ -343,6 +355,152 @@ export const mapsAPI = {
     const response = await apiClient.post('/maps/property-analysis', {
       latitude,
       longitude
+    });
+    return response.data;
+  },
+
+  calculateDistanceMatrix: async (
+    origins: string[],
+    destinations: string[],
+    mode: string = 'driving',
+    units: string = 'metric'
+  ) => {
+    const response = await apiClient.post('/maps/distance-matrix', {
+      origins,
+      destinations,
+      mode,
+      units
+    });
+    return response.data;
+  },
+
+  searchNearbyPlaces: async (
+    latitude: number,
+    longitude: number,
+    placeType: string = 'point_of_interest',
+    radius: number = 5000
+  ) => {
+    const response = await apiClient.post('/maps/places-search', {
+      latitude,
+      longitude,
+      place_type: placeType,
+      radius
+    });
+    return response.data;
+  },
+
+  findNearbyAmenities: async (latitude: number, longitude: number, radius: number = 5000) => {
+    const response = await apiClient.post('/maps/nearby-amenities', {
+      latitude,
+      longitude,
+      radius
+    });
+    return response.data;
+  },
+
+  detectPlanningAuthority: async (latitude: number, longitude: number) => {
+    const response = await apiClient.post('/maps/detect-authority', {
+      latitude,
+      longitude
+    });
+    return response.data;
+  },
+
+  getZoningRegulations: async (authorityInfo: any, zoningType: string = 'residential_medium') => {
+    const response = await apiClient.post('/maps/zoning-regulations', {
+      authority_info: authorityInfo,
+      zoning_type: zoningType
+    });
+    return response.data;
+  },
+
+  analyzeZoning: async (latitude: number, longitude: number, propertyType: string = 'residential') => {
+    const response = await apiClient.post('/maps/zoning-analysis', {
+      latitude,
+      longitude,
+      property_type: propertyType
+    });
+    return response.data;
+  },
+
+  getDevelopmentRecommendations: async (zoningAnalysis: any) => {
+    const response = await apiClient.post('/maps/development-recommendations', zoningAnalysis);
+    return response.data;
+  },
+
+  assessLandslideRisk: async (latitude: number, longitude: number, propertyType: string = 'residential') => {
+    const response = await apiClient.post('/maps/nbro-assessment', {
+      latitude,
+      longitude,
+      property_type: propertyType
+    });
+    return response.data;
+  },
+};
+
+// Regulations API functions
+export const regulationsAPI = {
+  analyzeCompliance: async (latitude: number, longitude: number, propertyType: string = 'residential', includeDocuments: boolean = true, generateReport: boolean = true) => {
+    const response = await apiClient.post('/regulations/analyze-compliance', {
+      latitude,
+      longitude,
+      property_type: propertyType,
+      include_documents: includeDocuments,
+      generate_report: generateReport
+    });
+    return response.data;
+  },
+
+  getApplicableRegulations: async (latitude: number, longitude: number, propertyType: string = 'residential') => {
+    const response = await apiClient.post('/regulations/applicable-regulations', {
+      latitude,
+      longitude,
+      property_type: propertyType
+    });
+    return response.data;
+  },
+
+  getDocuments: async (filters: {
+    category?: string;
+    authority?: string;
+    area?: string;
+    activeOnly?: boolean;
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.category) params.append('category', filters.category);
+    if (filters.authority) params.append('authority', filters.authority);
+    if (filters.area) params.append('area', filters.area);
+    if (filters.activeOnly !== undefined) params.append('active_only', filters.activeOnly.toString());
+
+    const response = await apiClient.get(`/regulations/documents?${params.toString()}`);
+    return response.data;
+  },
+
+  getDocumentsByLocation: async (latitude: number, longitude: number, radiusKm: number = 10) => {
+    const response = await apiClient.get(`/regulations/documents/by-location?lat=${latitude}&lng=${longitude}&radius_km=${radiusKm}`);
+    return response.data;
+  },
+
+  getDocument: async (documentId: string) => {
+    const response = await apiClient.get(`/regulations/documents/${documentId}`);
+    return response.data;
+  },
+
+  getComplianceReport: async (assessmentId: string) => {
+    const response = await apiClient.get(`/regulations/compliance-report/${assessmentId}`);
+    return response.data;
+  },
+
+  getCategories: async () => {
+    const response = await apiClient.get('/regulations/categories');
+    return response.data;
+  },
+
+  uploadDocument: async (documentData: FormData) => {
+    const response = await apiClient.post('/regulations/documents/upload', documentData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return response.data;
   },

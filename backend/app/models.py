@@ -56,26 +56,41 @@ class ValuerProfile(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
     
-    # Professional details
+    # Basic professional details
     titles = Column(String)  # Mr./Mrs./Dr./Prof.
+    full_name = Column(String)  # Complete professional name
+    designation = Column(String)  # Professional designation (e.g., Chartered Valuer, FIVSL)
     qualifications = Column(ARRAY(String))  # Professional qualifications
     panels = Column(ARRAY(String))  # Panel memberships
+    
+    # Registration & Membership
     registration_no = Column(String)  # Membership/Registration number
+    membership_status = Column(String)  # IVSL membership status
+    
+    # Company Information
+    company_name = Column(String)  # Valuation firm or company name
+    firm_address = Column(Text)  # Complete firm address
     
     # Contact information
-    address = Column(Text)
-    phones = Column(ARRAY(String))
-    email = Column(String)
+    address = Column(Text)  # Personal address
+    phones = Column(ARRAY(String))  # Personal phones
+    contact_phones = Column(ARRAY(String))  # Business/firm contact numbers
+    email = Column(String)  # Personal email
+    contact_email = Column(String)  # Business/professional email
     
-    # Signature
-    signature_file_id = Column(UUID(as_uuid=True), ForeignKey("files.id"), nullable=True)
+    # Professional Standards & Insurance
+    default_standards = Column(String)  # Default valuation standards applied
+    indemnity_status = Column(String)  # Professional indemnity insurance status
+    
+    # Default Legal Content (to reuse across reports)
+    default_disclaimers = Column(Text)  # Standard disclaimers text
+    default_certificate = Column(Text)  # Standard professional certificate text
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="valuer_profile")
-    signature_file = relationship("File")
 
 
 class Client(Base):
@@ -551,3 +566,149 @@ class Template(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class RegulationCategory(enum.Enum):
+    UDA = "uda"
+    MUNICIPAL = "municipal"
+    URBAN_COUNCIL = "urban_council"
+    PRADESHIYA_SABHA = "pradeshiya_sabha"
+    CEA = "cea"
+    NBRO = "nbro"
+    RDA = "rda"
+    OTHER = "other"
+
+
+class RegulationDocument(Base):
+    __tablename__ = "regulation_documents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Document details
+    title = Column(String, nullable=False)
+    description = Column(Text)
+    authority = Column(String, nullable=False)
+    category = Column(Enum(RegulationCategory), nullable=False)
+    document_type = Column(String, nullable=False)  # Development Plan, Building Regulations, etc.
+    
+    # File information
+    file_id = Column(UUID(as_uuid=True), ForeignKey("files.id"), nullable=False)
+    file_size = Column(Integer)
+    mime_type = Column(String)
+    
+    # Applicability
+    applicable_areas = Column(ARRAY(String))  # List of cities/districts
+    province = Column(String)
+    district = Column(String)
+    
+    # Geographic bounds (optional - for precise location matching)
+    north_bound = Column(Float)
+    south_bound = Column(Float)
+    east_bound = Column(Float)  
+    west_bound = Column(Float)
+    
+    # Regulatory details
+    effective_date = Column(DateTime)
+    expiry_date = Column(DateTime)
+    superseded_by_id = Column(UUID(as_uuid=True), ForeignKey("regulation_documents.id"), nullable=True)
+    version = Column(String)
+    gazette_number = Column(String)
+    
+    # Metadata
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    is_active = Column(Boolean, default=True)
+    download_count = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    file = relationship("File")
+    uploader = relationship("User")
+    superseded_by = relationship("RegulationDocument", remote_side=[id])
+    location_associations = relationship("RegulationLocationAssociation", back_populates="document")
+
+
+class RegulationLocationAssociation(Base):
+    __tablename__ = "regulation_location_associations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Association details
+    document_id = Column(UUID(as_uuid=True), ForeignKey("regulation_documents.id"), nullable=False)
+    location_identifier = Column(String, nullable=False)  # city, district, or coordinate bounds
+    priority = Column(Integer, default=1)  # 1=primary, 2=secondary, etc.
+    
+    # Location specifics
+    latitude = Column(Float)
+    longitude = Column(Float)
+    radius_km = Column(Float)  # Applicable radius in kilometers
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    document = relationship("RegulationDocument", back_populates="location_associations")
+
+
+class ComplianceChecklistTemplate(Base):
+    __tablename__ = "compliance_checklist_templates"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Template details
+    name = Column(String, nullable=False)
+    category = Column(Enum(RegulationCategory), nullable=False)
+    property_types = Column(ARRAY(String))  # applicable property types
+    
+    # Checklist content
+    mandatory_documents = Column(ARRAY(String))
+    recommended_documents = Column(ARRAY(String))
+    conditional_documents = Column(JSON)  # conditions and required documents
+    approval_stages = Column(ARRAY(String))
+    
+    # Process information
+    estimated_timeline_weeks = Column(Integer)
+    estimated_cost_range = Column(String)
+    complexity_level = Column(String)  # low, moderate, high
+    
+    # Template metadata
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    is_active = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    creator = relationship("User")
+
+
+class ComplianceAssessment(Base):
+    __tablename__ = "compliance_assessments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # Assessment details
+    report_id = Column(UUID(as_uuid=True), ForeignKey("reports.id"), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    property_type = Column(String, nullable=False)
+    
+    # Assessment results
+    applicable_regulations = Column(JSON)
+    compliance_requirements = Column(JSON)  
+    regulation_summary = Column(JSON)
+    complexity_level = Column(String)
+    
+    # Document associations
+    applicable_documents = Column(ARRAY(UUID(as_uuid=True)))  # References to RegulationDocument IDs
+    
+    # Assessment metadata
+    assessed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    assessment_version = Column(String, default="1.0")
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    report = relationship("Report")
+    assessor = relationship("User")
