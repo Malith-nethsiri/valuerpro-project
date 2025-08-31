@@ -5,17 +5,16 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { useStepValidation } from '@/hooks/useFieldValidation';
 import { validationSchemas } from '@/hooks/useFieldValidation';
 import { filesAPI, ocrAPI } from '@/lib/api';
+import MultiFileUpload from '@/components/MultiFileUpload';
 
 export const IdentificationStep = () => {
-  const { state, updateStepData, validateStep } = useWizard();
+  const { state, updateStepData, validateStep, populateFromAiAnalysis } = useWizard();
   const identification = state.data.identification;
   const { errors, isValid, validate } = useStepValidation(1);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   
   // OCR/AI functionality state
-  const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<any>(null);
   const [extractedData, setExtractedData] = useState<any>(null);
   const [showExtractedData, setShowExtractedData] = useState(false);
 
@@ -55,39 +54,205 @@ export const IdentificationStep = () => {
     });
   };
 
-  // Handle file upload and OCR processing
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, docType: 'survey' | 'deed') => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Handle multi-file upload and batch OCR processing
+  const handleFilesUploaded = async (fileIds: string[]) => {
+    if (fileIds.length === 0) return;
 
-    setUploading(true);
+    setAnalyzing(true);
     try {
-      // Upload file
-      const uploadResponse = await filesAPI.uploadSingle(file, state.reportId);
-      setUploadedFile(uploadResponse);
+      // Process multiple files with batch OCR
+      const batchResponse = await fetch('http://localhost:8000/api/v1/batch-ocr/batch-process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+        },
+        body: JSON.stringify({
+          file_ids: fileIds,
+          consolidate_analysis: true,
+          auto_populate: true,
+        }),
+      });
 
-      // Start OCR processing
-      setAnalyzing(true);
-      const ocrResponse = await ocrAPI.extractText(undefined, uploadResponse.file_id);
+      if (!batchResponse.ok) {
+        throw new Error('Batch processing failed');
+      }
+
+      const batchResult = await batchResponse.json();
       
-      // Analyze document with AI
-      const analysisResponse = await ocrAPI.analyzeDocument(uploadResponse.file_id);
+      // DEBUG: Log the full batch result for analysis
+      console.log('=== FULL BATCH RESULT DEBUG ===');
+      console.log('Batch result:', JSON.stringify(batchResult, null, 2));
       
-      // Extract relevant data from AI analysis
-      const extracted = parseExtractedData(analysisResponse, docType);
-      setExtractedData(extracted);
-      setShowExtractedData(true);
+      // Process results from all files
+      let successfulFiles: any[] = [];
+      let hasComprehensiveData = false;
+      
+      if (batchResult.files && batchResult.files.length > 0) {
+        successfulFiles = batchResult.files.filter((f: any) => f.success);
+        console.log('Batch result files:', batchResult.files);
+        console.log('Successful files:', successfulFiles);
+        
+        if (successfulFiles.length > 0) {
+          // Check if we have comprehensive data - use SmartDataMerger approach
+          console.log('=== CHECKING FOR COMPREHENSIVE DATA ===');
+          for (let i = 0; i < successfulFiles.length; i++) {
+            const file = successfulFiles[i];
+            console.log(`File ${i + 1}:`, {
+              filename: file.filename,
+              has_ai_analysis: !!file.ai_analysis,
+              has_comprehensive_data: !!file.ai_analysis?.comprehensive_data,
+              comprehensive_data_error: file.ai_analysis?.comprehensive_data?.error,
+              comprehensive_data_keys: file.ai_analysis?.comprehensive_data ? Object.keys(file.ai_analysis.comprehensive_data) : null
+            });
+          }
+          
+          hasComprehensiveData = successfulFiles.some(f => 
+            f.ai_analysis?.comprehensive_data && !f.ai_analysis.comprehensive_data.error
+          );
+          
+          console.log('Has comprehensive data overall:', hasComprehensiveData);
+          
+          if (hasComprehensiveData) {
+            // Use comprehensive data via wizard's populateFromAiAnalysis
+            console.log('Using comprehensive data format for AI population');
+            const firstFileWithComp = successfulFiles.find(f => 
+              f.ai_analysis?.comprehensive_data && !f.ai_analysis.comprehensive_data.error
+            );
+            if (firstFileWithComp) {
+              populateFromAiAnalysis({ comprehensive_data: firstFileWithComp.ai_analysis.comprehensive_data });
+              console.log('Applied comprehensive data to all wizard steps');
+            }
+          } else {
+            // Fallback to legacy format for preview/manual application
+            const extracted = parseExtractedDataFromBatch(batchResult);
+            console.log('Using legacy data format - parsed:', extracted);
+            setExtractedData(extracted);
+            setShowExtractedData(true);
+          }
+        }
+      }
+      
+      // Use consolidated analysis if available and no comprehensive data was already applied
+      if (batchResult.consolidated_analysis && !hasComprehensiveData) {
+        const consolidated = parseConsolidatedData(batchResult.consolidated_analysis);
+        console.log('Consolidated analysis:', batchResult.consolidated_analysis);
+        console.log('Parsed consolidated data:', consolidated);
+        setExtractedData(consolidated);
+        setShowExtractedData(true);
+      } else if (batchResult.consolidated_analysis && hasComprehensiveData) {
+        console.log('Skipping consolidated analysis - comprehensive data already applied');
+      }
       
     } catch (error) {
-      console.error('Failed to process document:', error);
-      alert('Failed to process document. Please try again.');
+      console.error('Failed to process documents:', error);
+      alert('Failed to process documents. Please try again.');
     } finally {
-      setUploading(false);
       setAnalyzing(false);
     }
   };
 
-  // Parse extracted data from AI analysis
+  // Parse extracted data from batch OCR results
+  const parseExtractedDataFromBatch = (batchResult: any) => {
+    const extracted: any = {};
+    
+    // Find the best data from successful files
+    const successfulFiles = batchResult.files.filter((f: any) => f.success);
+    
+    for (const file of successfulFiles) {
+      if (file.ai_analysis?.extracted_data) {
+        const data = file.ai_analysis.extracted_data;
+        const general = file.ai_analysis.general_data || {};
+        
+        // Merge data from all files, prioritizing survey plans
+        if (file.document_type === 'survey_plan' || !extracted.lot_number) {
+          Object.assign(extracted, {
+            lot_number: data.lot_number || extracted.lot_number,
+            plan_number: data.plan_number || extracted.plan_number,
+            plan_date: data.plan_date || extracted.plan_date,
+            surveyor_name: data.surveyor_name || extracted.surveyor_name,
+            extent_perches: data.extent_perches || extracted.extent_perches,
+            extent_sqm: data.extent_square_meters || extracted.extent_sqm,
+            boundaries: data.boundaries || extracted.boundaries,
+            location: data.location || extracted.location,
+          });
+        }
+        
+        // Add deed information if available
+        if (file.document_type === 'deed') {
+          Object.assign(extracted, {
+            deed_number: data.deed_number || extracted.deed_number,
+            deed_date: data.deed_date || extracted.deed_date,
+            parties: data.parties || extracted.parties,
+            property_description: data.property_description || extracted.property_description,
+          });
+        }
+        
+        // Add general property info
+        Object.assign(extracted, {
+          property_address: general.property_address || extracted.property_address,
+          owner_name: general.owner_name || extracted.owner_name,
+          property_type: general.property_type || extracted.property_type,
+        });
+      }
+    }
+    
+    return extracted;
+  };
+
+  // Parse consolidated analysis data
+  const parseConsolidatedData = (consolidatedAnalysis: any) => {
+    const extracted: any = {};
+    
+    // Extract from property details in consolidated analysis
+    const propertyDetails = consolidatedAnalysis.property_details || {};
+    const autoPopulationData = consolidatedAnalysis.auto_population_data || {};
+    
+    // Extract location details
+    if (propertyDetails.location) {
+      const location = propertyDetails.location;
+      extracted.village = location.village;
+      extracted.grama_niladhari_division = location.grama_niladhari_division;
+      extracted.divisional_secretariat = location.divisional_secretariat;
+      extracted.district = location.district;
+      extracted.province = location.province;
+    }
+    
+    // Extract boundaries
+    if (propertyDetails.boundaries) {
+      extracted.boundaries = propertyDetails.boundaries;
+    }
+    
+    // Extract from auto-population data
+    if (autoPopulationData.property_reference) {
+      extracted.property_reference = autoPopulationData.property_reference;
+    }
+    if (autoPopulationData.property_type) {
+      extracted.property_type = autoPopulationData.property_type;
+    }
+    if (autoPopulationData.land_area) {
+      extracted.land_area = autoPopulationData.land_area;
+    }
+    
+    // Extract encumbrances
+    if (propertyDetails.encumbrances) {
+      extracted.encumbrances = propertyDetails.encumbrances;
+    }
+    
+    // Extract deed date
+    if (propertyDetails.deed_date) {
+      extracted.deed_date = propertyDetails.deed_date;
+    }
+    
+    // Extract document types analyzed
+    if (consolidatedAnalysis.document_types_found) {
+      extracted.document_types = consolidatedAnalysis.document_types_found;
+    }
+    
+    return extracted;
+  };
+
+  // Parse extracted data from AI analysis (legacy single file)
   const parseExtractedData = (analysisResponse: any, docType: 'survey' | 'deed') => {
     // Extract from the correct nested structure returned by the backend API
     const extracted: any = {};
@@ -130,10 +295,11 @@ export const IdentificationStep = () => {
     return extracted;
   };
 
-  // Apply extracted data to form
+  // Apply extracted data to form and auto-populate other wizard steps
   const applyExtractedData = () => {
     if (!extractedData) return;
     
+    // Apply to identification step (current behavior)
     Object.keys(extractedData).forEach(key => {
       if (extractedData[key] !== null && extractedData[key] !== undefined && extractedData[key] !== '') {
         if (key === 'boundaries') {
@@ -143,9 +309,26 @@ export const IdentificationStep = () => {
         }
       }
     });
+
+    // Use centralized auto-population to fill other wizard steps
+    // Need to reconstruct the full AI analysis format for the centralized function
+    // Determine document type from extracted data or use a fallback
+    const detectedDocumentType = extractedData?.document_type || 
+      (extractedData?.plan_number ? 'survey_plan' : 'deed');
+    
+    const fullAiAnalysis = {
+      document_analysis: {
+        document_type: detectedDocumentType,
+        extracted_data: extractedData,
+        general_data: extractedData // Include general data as well
+      }
+    };
+
+    // Call centralized auto-population
+    populateFromAiAnalysis(fullAiAnalysis);
     
     setShowExtractedData(false);
-    alert('Data applied successfully! Please review and adjust as needed.');
+    alert('Data applied successfully to all relevant wizard steps! Please review and adjust as needed.');
   };
 
   // Reject extracted data
@@ -174,78 +357,17 @@ export const IdentificationStep = () => {
           Upload your survey plan or deed to automatically extract property identification details using OCR and AI technology.
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-blue-800 mb-2">
-              Upload Survey Plan
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.tiff"
-                onChange={(e) => handleFileUpload(e, 'survey')}
-                disabled={uploading || analyzing}
-                className="hidden"
-                id="survey-upload"
-              />
-              <label
-                htmlFor="survey-upload"
-                className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                  uploading || analyzing
-                    ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                    : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
-                }`}
-              >
-                {uploading ? (
-                  <span className="text-blue-600">📤 Uploading...</span>
-                ) : analyzing ? (
-                  <span className="text-blue-600">🔍 Analyzing...</span>
-                ) : (
-                  <span className="text-blue-700">📋 Choose Survey Plan File</span>
-                )}
-              </label>
-            </div>
-            <p className="text-xs text-blue-600 mt-1">PDF, JPG, PNG, TIFF supported</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-blue-800 mb-2">
-              Upload Deed
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.tiff"
-                onChange={(e) => handleFileUpload(e, 'deed')}
-                disabled={uploading || analyzing}
-                className="hidden"
-                id="deed-upload"
-              />
-              <label
-                htmlFor="deed-upload"
-                className={`flex items-center justify-center w-full px-4 py-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                  uploading || analyzing
-                    ? 'border-gray-300 bg-gray-50 cursor-not-allowed'
-                    : 'border-blue-300 hover:border-blue-400 hover:bg-blue-50'
-                }`}
-              >
-                {uploading ? (
-                  <span className="text-blue-600">📤 Uploading...</span>
-                ) : analyzing ? (
-                  <span className="text-blue-600">🔍 Analyzing...</span>
-                ) : (
-                  <span className="text-blue-700">📄 Choose Deed File</span>
-                )}
-              </label>
-            </div>
-            <p className="text-xs text-blue-600 mt-1">PDF, JPG, PNG, TIFF supported</p>
-          </div>
-        </div>
-
-        {uploadedFile && (
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-            <p className="text-sm text-green-800">
-              ✅ File uploaded: <strong>{uploadedFile.filename}</strong>
+        <MultiFileUpload
+          onFilesUploaded={handleFilesUploaded}
+          maxFiles={10}
+          acceptedTypes={['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff']}
+          className="mb-4"
+        />
+        
+        {analyzing && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-800 flex items-center">
+              🔍 <span className="ml-2">Analyzing documents with AI... This may take a few moments.</span>
             </p>
           </div>
         )}
