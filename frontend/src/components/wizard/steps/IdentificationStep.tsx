@@ -61,7 +61,8 @@ export const IdentificationStep = () => {
     setAnalyzing(true);
     try {
       // Process multiple files with batch OCR
-      const batchResponse = await fetch('http://localhost:8000/api/v1/batch-ocr/batch-process', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const batchResponse = await fetch(`${API_BASE_URL}/api/v1/batch-ocr/batch-process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -141,6 +141,31 @@ export class SmartDataMerger {
       );
     }
 
+    // Merge transport data
+    if (comprehensiveData.transport) {
+      this.mergeSection(
+        result,
+        'transport',
+        comprehensiveData.transport,
+        options
+      );
+    }
+
+    // Merge environmental data
+    if (comprehensiveData.environmental) {
+      this.mergeSection(
+        result,
+        'environmental',
+        comprehensiveData.environmental,
+        options
+      );
+    }
+
+    // Merge market analysis data
+    if (comprehensiveData.market) {
+      this.mergeMarketData(result, comprehensiveData.market, options);
+    }
+
     // Merge legal data
     if (comprehensiveData.legal) {
       this.mergeSection(
@@ -184,6 +209,74 @@ export class SmartDataMerger {
 
     if (options.logChanges && fieldsUpdatedInSection > 0) {
       console.log(`Updated ${fieldsUpdatedInSection} fields in ${sectionName} section`);
+    }
+  }
+
+  /**
+   * Special handling for market data (includes comparable sales arrays)
+   */
+  private static mergeMarketData(
+    result: MergeResult,
+    aiMarketData: any,
+    options: MergeOptions
+  ): void {
+    if (!result.mergedData.market) {
+      result.mergedData.market = {};
+    }
+
+    const existingMarket = result.mergedData.market as any;
+    let fieldsUpdatedInSection = 0;
+
+    // Handle comparable sales (array data)
+    if (aiMarketData.comparable_sales && Array.isArray(aiMarketData.comparable_sales)) {
+      const existingComparables = existingMarket.comparable_sales || [];
+      
+      // If no existing comparables, add AI extracted comparables
+      if (existingComparables.length === 0) {
+        const processedComparables = aiMarketData.comparable_sales
+          .filter(comp => comp.address && comp.sale_price)
+          .map((comp, index) => ({
+            id: `ai_comp_${Date.now()}_${index}`,
+            ...comp,
+            // Ensure required fields have defaults
+            adjustments: comp.adjustments || {
+              location: 0,
+              time: 0,
+              size: 0,
+              condition: 0,
+              other: 0,
+              total: 0
+            }
+          }));
+
+        if (processedComparables.length > 0) {
+          existingMarket.comparable_sales = processedComparables;
+          fieldsUpdatedInSection += processedComparables.length;
+          result.changesApplied.push(
+            `market.comparable_sales: Added ${processedComparables.length} comparables from AI`
+          );
+        }
+      }
+    }
+
+    // Handle other market data fields
+    const marketFields = ['market_trends', 'price_analysis', 'market_influences', 'forecast', 'market_summary'];
+    for (const field of marketFields) {
+      if (aiMarketData[field] && this.shouldUpdateField(existingMarket[field], aiMarketData[field], options)) {
+        const oldValue = existingMarket[field];
+        existingMarket[field] = this.processFieldValue(aiMarketData[field], field);
+        
+        result.changesApplied.push(
+          `market.${field}: ${this.formatValueForLog(oldValue)} → ${this.formatValueForLog(aiMarketData[field])}`
+        );
+        fieldsUpdatedInSection++;
+      }
+    }
+
+    result.fieldsUpdated += fieldsUpdatedInSection;
+
+    if (options.logChanges && fieldsUpdatedInSection > 0) {
+      console.log(`Updated ${fieldsUpdatedInSection} fields in market section`);
     }
   }
 

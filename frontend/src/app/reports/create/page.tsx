@@ -12,6 +12,9 @@ import { SiteStep } from '@/components/wizard/steps/SiteStep';
 import { BuildingsStep } from '@/components/wizard/steps/BuildingsStep';
 import { UtilitiesStep } from '@/components/wizard/steps/UtilitiesStep';
 import { PlanningStep } from '@/components/wizard/steps/PlanningStep';
+import { TransportStep } from '@/components/wizard/steps/TransportStep';
+import { EnvironmentalStep } from '@/components/wizard/steps/EnvironmentalStep';
+import { MarketAnalysisStep } from '@/components/wizard/steps/MarketAnalysisStep';
 import { LocalityStep } from '@/components/wizard/steps/LocalityStep';
 import { ValuationStep } from '@/components/wizard/steps/ValuationStep';
 import { LegalStep } from '@/components/wizard/steps/LegalStep';
@@ -37,7 +40,7 @@ const wizardSteps = [
   },
   {
     id: 'location',
-    title: 'Location & Access',
+    title: 'Location',
     description: 'Address, coordinates, directions',
     completed: false,
     current: false,
@@ -67,6 +70,27 @@ const wizardSteps = [
     id: 'planning',
     title: 'Planning/Zoning',
     description: 'Zoning, restrictions, easements',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'transport',
+    title: 'Transport & Access',
+    description: 'Roads, public transport, connectivity',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'environmental',
+    title: 'Environmental Factors',
+    description: 'NBRO, hazards, climate, clearances',
+    completed: false,
+    current: false,
+  },
+  {
+    id: 'market',
+    title: 'Market Analysis',
+    description: 'Comparables, trends, pricing',
     completed: false,
     current: false,
   },
@@ -198,14 +222,20 @@ const CreateReportWizard = () => {
       case 6:
         return <PlanningStep />;
       case 7:
-        return <LocalityStep />;
+        return <TransportStep />;
       case 8:
-        return <ValuationStep />;
+        return <EnvironmentalStep />;
       case 9:
-        return <LegalStep />;
+        return <MarketAnalysisStep />;
       case 10:
-        return <AppendicesStep />;
+        return <LocalityStep />;
       case 11:
+        return <ValuationStep />;
+      case 12:
+        return <LegalStep />;
+      case 13:
+        return <AppendicesStep />;
+      case 14:
         return <ReviewStep />;
       default:
         return <ReportInfoStep />;

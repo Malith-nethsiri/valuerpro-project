@@ -4,10 +4,6 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.api.api_v1.api import api_router
-from app.api.simple_monitoring import router as monitoring_router
-from app.api.optimization import router as optimization_router
-from app.api.production_integration import router as production_router
-from app.api.maintenance import router as maintenance_router
 
 
 @asynccontextmanager
@@ -24,14 +20,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Set up CORS - allowing frontend on different ports
+# Set up CORS - allowing frontend on different ports and public tunnel
+import os
+PUBLIC_FRONTEND_URL = os.getenv("PUBLIC_FRONTEND_URL", "")
+PUBLIC_BACKEND_URL = os.getenv("PUBLIC_BACKEND_URL", "")
+
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3002",
+    "https://julie-continue-constructed-need.trycloudflare.com",  # Frontend tunnel URL
+]
+
+# Add environment-specific tunnel URLs
+if PUBLIC_FRONTEND_URL:
+    allowed_origins.append(PUBLIC_FRONTEND_URL)
+if PUBLIC_BACKEND_URL:
+    # Allow backend to accept requests from its own URL for internal calls
+    allowed_origins.append(PUBLIC_BACKEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001", 
-        "http://localhost:3002"
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,10 +49,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(api_router, prefix="/api/v1")
-app.include_router(monitoring_router)
-app.include_router(optimization_router)
-app.include_router(production_router)
-app.include_router(maintenance_router)
 
 
 @app.get("/health")

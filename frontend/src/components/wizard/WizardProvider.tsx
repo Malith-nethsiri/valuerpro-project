@@ -32,6 +32,9 @@ const initialState: WizardState = {
     buildings: [],
     utilities: {},
     planning: {},
+    transport: {},
+    environmental: {},
+    market: {},
     locality: {},
     valuation: {
       lines: [],
@@ -154,13 +157,13 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
   }, [state.isDirty, state.data, state.reportId]);
 
   const goToStep = (step: number) => {
-    if (step >= 0 && step < 12 && canGoToStep(step)) {
+    if (step >= 0 && step < 15 && canGoToStep(step)) {
       dispatch({ type: 'SET_STEP', payload: step });
     }
   };
 
   const nextStep = () => {
-    if (state.currentStep < 11) {
+    if (state.currentStep < 14) {
       dispatch({ type: 'SET_STEP', payload: state.currentStep + 1 });
     }
   };
@@ -317,7 +320,51 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
         }
         break;
         
-      case 7: // Locality
+      case 7: // Transport & Access
+        if (isEmpty(data.transport.road_type)) {
+          errors.push('Road type is required');
+        }
+        if (isEmpty(data.transport.road_condition)) {
+          errors.push('Road condition assessment is required');
+        }
+        if (!validateNumber(data.transport.road_width, 0)) {
+          errors.push('Valid road width is required');
+        }
+        if (isEmpty(data.transport.accessibility_rating)) {
+          errors.push('Overall accessibility rating is required');
+        }
+        break;
+        
+      case 8: // Environmental Factors
+        if (isEmpty(data.environmental.nbro_clearance)) {
+          errors.push('NBRO clearance status is required');
+        }
+        if (isEmpty(data.environmental.environmental_impact)) {
+          errors.push('Environmental impact assessment is required');
+        }
+        break;
+        
+      case 9: // Market Analysis
+        if (isEmpty(data.market.market_summary)) {
+          errors.push('Market analysis summary is required');
+        }
+        // Validate comparable sales if any exist
+        if (data.market.comparable_sales && data.market.comparable_sales.length > 0) {
+          data.market.comparable_sales.forEach((comp: any, index: number) => {
+            if (isEmpty(comp.address)) {
+              errors.push(`Comparable ${index + 1}: Address is required`);
+            }
+            if (!validateNumber(comp.sale_price, 1)) {
+              errors.push(`Comparable ${index + 1}: Valid sale price is required`);
+            }
+            if (!validateNumber(comp.land_extent, 0.01)) {
+              errors.push(`Comparable ${index + 1}: Valid land extent is required`);
+            }
+          });
+        }
+        break;
+        
+      case 10: // Locality
         if (isEmpty(data.locality.area_type)) {
           errors.push('Area type classification is required');
         }
@@ -329,7 +376,7 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
         }
         break;
         
-      case 8: // Valuation
+      case 11: // Valuation
         if (!data.valuation.summary.market_value || !validateNumber(data.valuation.summary.market_value, 1)) {
           errors.push('Market value must be greater than 0');
         }
@@ -357,7 +404,7 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
         }
         break;
         
-      case 9: // Legal
+      case 12: // Legal
         if (isEmpty(data.legal.disclaimers)) {
           errors.push('Legal disclaimers are required');
         }
@@ -369,7 +416,7 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
         }
         break;
         
-      case 10: // Appendices
+      case 13: // Appendices
         const hasFiles = data.appendices.files && data.appendices.files.length > 0;
         const hasPhotos = data.appendices.photos && data.appendices.photos.length > 0;
         if (!hasFiles && !hasPhotos) {
@@ -377,9 +424,9 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
         }
         break;
         
-      case 11: // Review
+      case 14: // Review
         // Validate that all previous steps are complete
-        for (let i = 0; i < 11; i++) {
+        for (let i = 0; i < 14; i++) {
           const stepErrors = validateStep(i);
           if (stepErrors.length > 0) {
             errors.push(`Step ${i + 1} has validation errors that must be resolved`);
@@ -408,7 +455,7 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
   const getStepCompletion = (): boolean[] => {
     const completion: boolean[] = [];
     
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 15; i++) {
       const errors = validateStep(i);
       completion.push(errors.length === 0);
     }
@@ -731,7 +778,65 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 8. Populate Legal Step
+    // 8. Populate Transport Step
+    if (comprehensiveData.transport) {
+      const transport = comprehensiveData.transport;
+      const transportUpdate: any = {};
+      
+      if (transport.road_type) transportUpdate.road_type = transport.road_type;
+      if (transport.road_condition) transportUpdate.road_condition = transport.road_condition;
+      if (transport.road_width) transportUpdate.road_width = transport.road_width;
+      if (transport.access_quality) transportUpdate.access_quality = transport.access_quality;
+      if (transport.public_transport_available) transportUpdate.public_transport_available = transport.public_transport_available;
+      if (transport.parking_availability) transportUpdate.parking_availability = transport.parking_availability;
+      if (transport.accessibility_rating) transportUpdate.accessibility_rating = transport.accessibility_rating;
+      if (transport.transport_impact) transportUpdate.transport_impact = transport.transport_impact;
+      if (transport.transport_notes) transportUpdate.transport_notes = transport.transport_notes;
+      
+      if (Object.keys(transportUpdate).length > 0) {
+        updateStepData('transport', transportUpdate);
+      }
+    }
+
+    // 9. Populate Environmental Step
+    if (comprehensiveData.environmental) {
+      const environmental = comprehensiveData.environmental;
+      const environmentalUpdate: any = {};
+      
+      if (environmental.nbro_clearance) environmentalUpdate.nbro_clearance = environmental.nbro_clearance;
+      if (environmental.landslide_risk) environmentalUpdate.landslide_risk = environmental.landslide_risk;
+      if (environmental.flood_risk) environmentalUpdate.flood_risk = environmental.flood_risk;
+      if (environmental.climate_zone) environmentalUpdate.climate_zone = environmental.climate_zone;
+      if (environmental.air_quality) environmentalUpdate.air_quality = environmental.air_quality;
+      if (environmental.noise_levels) environmentalUpdate.noise_levels = environmental.noise_levels;
+      if (environmental.environmental_impact) environmentalUpdate.environmental_impact = environmental.environmental_impact;
+      if (environmental.natural_hazards) environmentalUpdate.natural_hazards = environmental.natural_hazards;
+      if (environmental.environmental_restrictions) environmentalUpdate.environmental_restrictions = environmental.environmental_restrictions;
+      if (environmental.environmental_notes) environmentalUpdate.environmental_notes = environmental.environmental_notes;
+      
+      if (Object.keys(environmentalUpdate).length > 0) {
+        updateStepData('environmental', environmentalUpdate);
+      }
+    }
+
+    // 10. Populate Market Analysis Step
+    if (comprehensiveData.market) {
+      const market = comprehensiveData.market;
+      const marketUpdate: any = {};
+      
+      if (market.comparable_sales) marketUpdate.comparable_sales = market.comparable_sales;
+      if (market.rental_comparables) marketUpdate.rental_comparables = market.rental_comparables;
+      if (market.market_trends) marketUpdate.market_trends = market.market_trends;
+      if (market.price_analysis) marketUpdate.price_analysis = market.price_analysis;
+      if (market.market_influences) marketUpdate.market_influences = market.market_influences;
+      if (market.market_summary) marketUpdate.market_summary = market.market_summary;
+      
+      if (Object.keys(marketUpdate).length > 0) {
+        updateStepData('market', marketUpdate);
+      }
+    }
+
+    // 11. Populate Legal Step
     if (comprehensiveData.legal) {
       const legal = comprehensiveData.legal;
       const legalUpdate: any = {};

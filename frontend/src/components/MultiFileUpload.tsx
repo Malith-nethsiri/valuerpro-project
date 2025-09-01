@@ -67,7 +67,8 @@ export default function MultiFileUpload({
           );
         }, 100);
 
-        const response = await fetch('http://localhost:8000/api/v1/uploads/single', {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE_URL}/api/v1/uploads/single`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('access_token')}`,

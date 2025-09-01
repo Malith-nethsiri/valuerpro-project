@@ -591,7 +591,124 @@ export interface ReportWizardData {
     planning_summary?: string;
   };
   
-  // Step 8: Locality
+  // Step 8: Transport & Access
+  transport: {
+    road_type?: string;
+    road_condition?: string;
+    road_width?: number;
+    access_width?: number;
+    access_quality?: string;
+    distance_to_main_road?: number;
+    public_transport_available?: boolean;
+    nearest_bus_stop?: number;
+    nearest_railway_station?: string;
+    distance_to_railway?: number;
+    nearest_airport?: string;
+    distance_to_airport?: number;
+    parking_availability?: string;
+    traffic_conditions?: string;
+    accessibility_rating?: string;
+    transport_impact?: string;
+    transport_notes?: string;
+  };
+  
+  // Step 9: Environmental Factors
+  environmental: {
+    nbro_clearance?: string;
+    landslide_risk?: string;
+    flood_risk?: string;
+    erosion_risk?: string;
+    earthquake_zone?: string;
+    climate_zone?: string;
+    average_rainfall?: number;
+    temperature_range?: string;
+    wind_patterns?: string;
+    natural_hazards?: string[];
+    environmental_restrictions?: string[];
+    conservation_area?: boolean;
+    wetland_proximity?: string;
+    forest_reserve_proximity?: string;
+    coastal_proximity?: string;
+    river_proximity?: string;
+    industrial_proximity?: string;
+    pollution_sources?: string[];
+    air_quality?: string;
+    noise_levels?: string;
+    soil_contamination?: string;
+    water_quality?: string;
+    environmental_clearances?: string[];
+    protected_species?: boolean;
+    archaeological_significance?: boolean;
+    environmental_impact?: string;
+    sustainability_features?: string[];
+    environmental_notes?: string;
+  };
+  
+  // Step 10: Market Analysis  
+  market: {
+    comparable_sales?: {
+      id: string;
+      address: string;
+      distance_km: number;
+      sale_date: string;
+      sale_price: number;
+      price_per_perch: number;
+      land_extent: number;
+      building_area?: number;
+      property_type: string;
+      condition: string;
+      adjustments: {
+        location: number;
+        time: number;
+        size: number;
+        condition: number;
+        other: number;
+        total: number;
+      };
+      adjusted_price_per_perch: number;
+      notes?: string;
+    }[];
+    rental_comparables?: {
+      id: string;
+      address: string;
+      monthly_rent: number;
+      property_type: string;
+      building_area: number;
+      rental_yield: number;
+    }[];
+    market_trends?: {
+      area_growth_rate?: number;
+      price_trend_direction?: string;
+      market_activity?: string;
+      average_selling_period?: number;
+      price_volatility?: string;
+      demand_supply_balance?: string;
+    };
+    price_analysis?: {
+      comparable_range_low?: number;
+      comparable_range_high?: number;
+      average_price_per_perch?: number;
+      median_price_per_perch?: number;
+      subject_property_position?: string;
+      pricing_rationale?: string;
+    };
+    market_influences?: {
+      economic_factors?: string[];
+      infrastructure_developments?: string[];
+      zoning_changes?: string[];
+      demographic_changes?: string[];
+      seasonal_factors?: string[];
+    };
+    forecast?: {
+      short_term_outlook?: string;
+      medium_term_outlook?: string;
+      growth_drivers?: string[];
+      risk_factors?: string[];
+    };
+    market_summary?: string;
+  };
+
+  // Step 11: Locality
   locality: {
     area_type?: string;
     development_stage?: string;
@@ -620,7 +737,7 @@ export interface ReportWizardData {
     market_analysis_summary?: string;
   };
   
-  // Step 9: Valuation
+  // Step 12: Valuation
   valuation: {
     method?: string;
     valuation_date?: string;
@@ -648,7 +765,7 @@ export interface ReportWizardData {
     valuation_comments?: string;
   };
   
-  // Step 10: Legal & Disclaimers
+  // Step 13: Legal & Disclaimers
   legal: {
     assumptions?: string[];
     additional_assumptions?: string;
@@ -671,7 +788,7 @@ export interface ReportWizardData {
     special_limitations?: string;
   };
   
-  // Step 11: Appendices
+  // Step 14: Appendices
   appendices: {
     files?: {
       id: string;
@@ -702,7 +819,7 @@ export interface ReportWizardData {
     instructions?: string;
   };
   
-  // Step 12: Review & Generate
+  // Step 15: Review & Generate
   review: {
     validation_errors?: string[];
     completion_status?: Record<string, boolean>;

@@ -38,7 +38,17 @@
       "Bash(dir:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(echo $OS)",
+      "Bash(winget install:*)",
+      "Bash(.cloudflared.exe tunnel --url http://localhost:8000)",
+      "Bash(.cloudflared.exe tunnel --url http://localhost:3000)",
+      "Bash(\"D:\\valuerpro_project\\cloudflared.exe\" tunnel --url http://localhost:8000)",
+      "Bash(\"D:\\valuerpro_project\\cloudflared.exe\" tunnel --url http://localhost:3000)",
+      "Bash(set PUBLIC_FRONTEND_URL=https://julie-continue-constructed-need.trycloudflare.com)",
+      "Bash(set PUBLIC_BACKEND_URL=https://olympic-stations-this-modification.trycloudflare.com)",
+      "Bash(echo $PUBLIC_FRONTEND_URL)",
+      "Bash(echo $PUBLIC_BACKEND_URL)"
     ],
     "deny": [],
     "ask": [],
