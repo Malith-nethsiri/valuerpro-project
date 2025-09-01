@@ -51,7 +51,14 @@
       "Bash(echo $PUBLIC_BACKEND_URL)",
       "Bash(npm run clean:*)",
       "Bash(uvicorn:*)",
-      "Bash(docker system prune:*)"
+      "Bash(docker system prune:*)",
+      "WebSearch",
+      "Bash(npm cache clean:*)",
+      "Bash(pip cache:*)",
+      "Bash(pip install:*)",
+      "Bash(\"D:\\valuerpro_project\\cloudflared.exe\" tunnel --url http://localhost:3003)",
+      "Bash(./cloudflared.exe tunnel --url http://localhost:8000)",
+      "Bash(./cloudflared.exe tunnel --url http://localhost:3003)"
     ],
     "deny": [],
     "ask": [],

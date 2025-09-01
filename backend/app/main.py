@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
@@ -29,7 +30,8 @@ allowed_origins = [
     "http://localhost:3000",
     "http://localhost:3001", 
     "http://localhost:3002",
-    "https://julie-continue-constructed-need.trycloudflare.com",  # Frontend tunnel URL
+    "http://localhost:3003",
+    "https://unto-served-investigate-forge.trycloudflare.com",  # Frontend tunnel URL
 ]
 
 # Add environment-specific tunnel URLs
@@ -55,3 +57,21 @@ app.include_router(api_router, prefix="/api/v1")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "valuerpro-backend"}
+
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt():
+    """Robots.txt for ChatGPT and other crawlers"""
+    robots_content = """User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: *
+Allow: /"""
+    return robots_content

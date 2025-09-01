@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-from app.core.database import get_db
+from app.db import get_db
 from app.services.google_maps import reverse_geocode, is_google_maps_available
 from app.services.srilanka_admin_divisions import (
     SriLankaAdminDivisions, 

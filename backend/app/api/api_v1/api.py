@@ -13,3 +13,9 @@ api_router.include_router(maps.router, prefix="/maps", tags=["maps"])
 api_router.include_router(location.router, prefix="/location", tags=["location"])
 api_router.include_router(regulations.router, prefix="/regulations", tags=["regulations"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["background-jobs"])
+
+
+@api_router.get("/healthz")
+async def healthz():
+    """Health check endpoint for monitoring"""
+    return {"ok": True}
