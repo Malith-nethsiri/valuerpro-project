@@ -31,7 +31,9 @@ allowed_origins = [
     "http://localhost:3001", 
     "http://localhost:3002",
     "http://localhost:3003",
-    "https://unto-served-investigate-forge.trycloudflare.com",  # Frontend tunnel URL
+    "https://unto-served-investigate-forge.trycloudflare.com",  # Old Frontend tunnel URL
+    "https://graduation-simulations-extends-chrome.trycloudflare.com",  # Old Frontend tunnel URL
+    "https://attitudes-select-troops-mailed.trycloudflare.com",  # Current Frontend tunnel URL
 ]
 
 # Add environment-specific tunnel URLs

@@ -58,7 +58,10 @@
       "Bash(pip install:*)",
       "Bash(\"D:\\valuerpro_project\\cloudflared.exe\" tunnel --url http://localhost:3003)",
       "Bash(./cloudflared.exe tunnel --url http://localhost:8000)",
-      "Bash(./cloudflared.exe tunnel --url http://localhost:3003)"
+      "Bash(./cloudflared.exe tunnel --url http://localhost:3003)",
+      "Bash(docker-compose:*)",
+      "Bash(node:*)",
+      "Bash(./cloudflared.exe tunnel:*)"
     ],
     "deny": [],
     "ask": [],
