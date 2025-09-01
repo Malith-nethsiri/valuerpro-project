@@ -45,16 +45,33 @@ class OCRResponse(BaseModel):
     file_path: str
 
 
-def extract_text_from_image(image_data: bytes, client: vision.ImageAnnotatorClient) -> str:
-    """Extract text from image using Google Vision API"""
+def extract_text_from_image(image_data: bytes, client: vision.ImageAnnotatorClient, is_pdf_page: bool = False) -> str:
+    """Extract text from image using Google Vision API with enhanced detection"""
     image = vision.Image(content=image_data)
-    response = client.text_detection(image=image)
     
-    if response.error.message:
-        raise Exception(f"Vision API error: {response.error.message}")
-    
-    texts = response.text_annotations
-    return texts[0].description if texts else ""
+    # Use document_text_detection for better layout preservation, especially for PDFs
+    if is_pdf_page:
+        response = client.document_text_detection(image=image)
+        
+        if response.error.message:
+            raise Exception(f"Vision API error: {response.error.message}")
+        
+        # For document text detection, use full_text_annotation for better layout preservation
+        if response.full_text_annotation:
+            return response.full_text_annotation.text
+        # Fallback to text_annotations if full_text_annotation is not available
+        elif response.text_annotations:
+            return response.text_annotations[0].description
+        return ""
+    else:
+        # For regular images, use standard text detection
+        response = client.text_detection(image=image)
+        
+        if response.error.message:
+            raise Exception(f"Vision API error: {response.error.message}")
+        
+        texts = response.text_annotations
+        return texts[0].description if texts else ""
 
 
 def extract_text_with_ocr(file_path: str) -> OCRResponse:
@@ -94,7 +111,7 @@ def process_pdf_file(pdf_path: str, client: vision.ImageAnnotatorClient) -> OCRR
         pix = page.get_pixmap()
         img_data = pix.tobytes("png")
         
-        text = extract_text_from_image(img_data, client)
+        text = extract_text_from_image(img_data, client, is_pdf_page=True)
         pages.append(OCRPageResult(page=page_num + 1, text=text))
     
     pdf_document.close()
@@ -129,7 +146,7 @@ def process_image_file(image_path: str, client: vision.ImageAnnotatorClient) -> 
     with open(image_path, 'rb') as f:
         image_data = f.read()
     
-    text = extract_text_from_image(image_data, client)
+    text = extract_text_from_image(image_data, client, is_pdf_page=False)
     
     return OCRResponse(
         pages=[OCRPageResult(page=1, text=text)],

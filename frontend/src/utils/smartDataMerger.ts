@@ -76,102 +76,112 @@ export class SmartDataMerger {
     comprehensiveData: any,
     options: MergeOptions
   ): void {
+    // Merge report information
+    if (comprehensiveData.report_information) {
+      this.mergeSection(
+        result,
+        'reportInfo',
+        comprehensiveData.report_information,
+        options
+      );
+    }
+
     // Merge identification data
-    if (comprehensiveData.identification) {
+    if (comprehensiveData.property_identification) {
       this.mergeSection(
         result,
         'identification',
-        comprehensiveData.identification,
+        comprehensiveData.property_identification,
         options
       );
     }
 
     // Merge location data
-    if (comprehensiveData.location) {
+    if (comprehensiveData.location_details) {
       this.mergeSection(
         result,
         'location',
-        comprehensiveData.location,
+        comprehensiveData.location_details,
         options
       );
     }
 
     // Merge site data
-    if (comprehensiveData.site) {
+    if (comprehensiveData.site_characteristics) {
       this.mergeSection(
         result,
         'site',
-        comprehensiveData.site,
+        comprehensiveData.site_characteristics,
         options
       );
     }
 
     // Merge buildings data (special handling for arrays)
-    if (comprehensiveData.buildings && Array.isArray(comprehensiveData.buildings)) {
-      this.mergeBuildingsData(result, comprehensiveData.buildings, options);
+    if (comprehensiveData.buildings_improvements && Array.isArray(comprehensiveData.buildings_improvements)) {
+      this.mergeBuildingsData(result, comprehensiveData.buildings_improvements, options);
     }
 
     // Merge utilities data
-    if (comprehensiveData.utilities) {
+    if (comprehensiveData.utilities_assessment) {
       this.mergeSection(
         result,
         'utilities',
-        comprehensiveData.utilities,
+        comprehensiveData.utilities_assessment,
         options
       );
     }
 
     // Merge locality data
-    if (comprehensiveData.locality) {
+    if (comprehensiveData.locality_analysis) {
       this.mergeSection(
         result,
         'locality',
-        comprehensiveData.locality,
+        comprehensiveData.locality_analysis,
         options
       );
     }
 
     // Merge planning data
-    if (comprehensiveData.planning) {
+    if (comprehensiveData.planning_zoning) {
       this.mergeSection(
         result,
         'planning',
-        comprehensiveData.planning,
+        comprehensiveData.planning_zoning,
         options
       );
     }
 
     // Merge transport data
-    if (comprehensiveData.transport) {
+    if (comprehensiveData.transport_access) {
       this.mergeSection(
         result,
         'transport',
-        comprehensiveData.transport,
+        comprehensiveData.transport_access,
         options
       );
     }
 
     // Merge environmental data
-    if (comprehensiveData.environmental) {
+    if (comprehensiveData.environmental_factors) {
       this.mergeSection(
         result,
         'environmental',
-        comprehensiveData.environmental,
+        comprehensiveData.environmental_factors,
         options
       );
     }
 
     // Merge market analysis data
-    if (comprehensiveData.market) {
-      this.mergeMarketData(result, comprehensiveData.market, options);
+    if (comprehensiveData.market_analysis) {
+      this.mergeMarketData(result, comprehensiveData.market_analysis, options);
     }
 
     // Merge legal data
-    if (comprehensiveData.legal) {
+    if (comprehensiveData.legal_information) {
       this.mergeSection(
         result,
         'legal',
-        comprehensiveData.legal,
+        comprehensiveData.legal_information,
         options
       );
     }
@@ -293,10 +303,23 @@ export class SmartDataMerger {
     // If no existing buildings, add AI extracted buildings
     if (!existingBuildings || existingBuildings.length === 0) {
       const processedBuildings = aiBuildingsData
-        .filter(building => building.type || building.floor_area)
+        .filter(building => building.building_type || building.type || building.floor_area)
         .map((building, index) => ({
           id: Date.now().toString() + index,
-          ...building
+          type: building.building_type || building.type,
+          use: building.primary_use || building.use,
+          floor_area: building.floor_area,
+          construction_year: building.construction_year,
+          construction_type: building.construction_type,
+          roof_type: building.roof_type,
+          wall_type: building.wall_type,
+          floor_type: building.floor_type,
+          condition: building.condition,
+          stories: building.stories,
+          rooms: building.rooms,
+          special_features: building.special_features,
+          renovation_required: building.renovation_required,
+          estimated_replacement_cost: building.estimated_replacement_cost
         }));
 
       if (processedBuildings.length > 0) {

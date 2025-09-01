@@ -59,23 +59,42 @@ def get_vision_client():
     return vision.ImageAnnotatorClient()
 
 
-def extract_text_from_image(image_data: bytes) -> tuple[str, float]:
-    """Extract text from image using Google Vision API"""
+def extract_text_from_image(image_data: bytes, is_pdf_page: bool = False) -> tuple[str, float]:
+    """Extract text from image using Google Vision API with enhanced detection"""
     client = get_vision_client()
     
     image = vision.Image(content=image_data)
-    response = client.document_text_detection(image=image)
     
-    if response.error.message:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Vision API error: {response.error.message}"
-        )
-    
-    full_text = response.full_text_annotation.text if response.full_text_annotation else ""
-    confidence = response.full_text_annotation.pages[0].confidence if response.full_text_annotation and response.full_text_annotation.pages else 0.0
-    
-    return full_text, confidence
+    # Use document_text_detection for better layout preservation, especially for PDFs
+    if is_pdf_page:
+        response = client.document_text_detection(image=image)
+        
+        if response.error.message:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Vision API error: {response.error.message}"
+            )
+        
+        full_text = response.full_text_annotation.text if response.full_text_annotation else ""
+        confidence = response.full_text_annotation.pages[0].confidence if response.full_text_annotation and response.full_text_annotation.pages else 0.0
+        
+        return full_text, confidence
+    else:
+        # For regular images, use standard text detection
+        response = client.text_detection(image=image)
+        
+        if response.error.message:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Vision API error: {response.error.message}"
+            )
+        
+        # Extract text and confidence
+        full_text = response.text_annotations[0].description if response.text_annotations else ""
+        # For text_detection, confidence is not readily available, use a default
+        confidence = 0.85 if full_text else 0.0
+        
+        return full_text, confidence
 
 
 def pdf_to_images(pdf_path: str) -> List[bytes]:
@@ -149,7 +168,7 @@ async def extract_text(
             image_data_list = pdf_to_images(file_path)
             
             for page_num, image_data in enumerate(image_data_list, 1):
-                text, confidence = extract_text_from_image(image_data)
+                text, confidence = extract_text_from_image(image_data, is_pdf_page=True)
                 pages.append(OCRPageResult(
                     page=page_num,
                     text=text,
@@ -161,7 +180,7 @@ async def extract_text(
             with open(file_path, 'rb') as f:
                 image_data = f.read()
             
-            text, confidence = extract_text_from_image(image_data)
+            text, confidence = extract_text_from_image(image_data, is_pdf_page=False)
             pages.append(OCRPageResult(
                 page=1,
                 text=text,

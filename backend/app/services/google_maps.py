@@ -5,6 +5,7 @@ import os
 import requests
 from typing import Dict, List, Optional, Tuple, Any
 from app.core.config import settings
+from app.services.srilanka_admin_divisions import enhance_location_with_admin_divisions
 
 # Google Maps API base URLs
 STATIC_MAPS_BASE_URL = "https://maps.googleapis.com/maps/api/staticmap"
@@ -236,11 +237,18 @@ def reverse_geocode(latitude: float, longitude: float) -> Dict[str, Any]:
             elif "country" in types:
                 components["country"] = component["long_name"]
         
-        return {
+        google_maps_data = {
             "formatted_address": result["formatted_address"],
             "components": components,
             "place_id": result.get("place_id")
         }
+        
+        # Enhance with Sri Lankan administrative divisions
+        enhanced_data = enhance_location_with_admin_divisions(
+            latitude, longitude, google_maps_data
+        )
+        
+        return enhanced_data
         
     except Exception as e:
         return {"error": f"Reverse geocoding failed: {str(e)}"}

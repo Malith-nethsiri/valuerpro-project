@@ -613,9 +613,25 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
   const populateFromComprehensiveData = (comprehensiveData: any): void => {
     console.log('Populating from comprehensive AI data:', comprehensiveData);
     
-    // 1. Populate Identification Step
-    if (comprehensiveData.identification) {
-      const identification = comprehensiveData.identification;
+    // 1. Populate Report Information Step (if available)
+    if (comprehensiveData.report_information) {
+      const reportInfo = comprehensiveData.report_information;
+      const reportInfoUpdate: any = {};
+      
+      if (reportInfo.client_name) reportInfoUpdate.client_name = reportInfo.client_name;
+      if (reportInfo.property_owner) reportInfoUpdate.property_owner = reportInfo.property_owner;
+      if (reportInfo.valuation_purpose) reportInfoUpdate.purpose = reportInfo.valuation_purpose;
+      if (reportInfo.inspection_date) reportInfoUpdate.inspection_date = reportInfo.inspection_date;
+      if (reportInfo.report_date) reportInfoUpdate.report_date = reportInfo.report_date;
+      
+      if (Object.keys(reportInfoUpdate).length > 0) {
+        updateStepData('reportInfo', reportInfoUpdate);
+      }
+    }
+    
+    // 2. Populate Property Identification Step
+    if (comprehensiveData.property_identification) {
+      const identification = comprehensiveData.property_identification;
       const identificationUpdate: any = {};
       
       if (identification.lot_number) identificationUpdate.lot_number = identification.lot_number;
@@ -624,24 +640,22 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       if (identification.surveyor_name) identificationUpdate.surveyor_name = identification.surveyor_name;
       if (identification.licensed_surveyor_number) identificationUpdate.licensed_surveyor_number = identification.licensed_surveyor_number;
       if (identification.land_name) identificationUpdate.land_name = identification.land_name;
+      if (identification.property_name) identificationUpdate.property_name = identification.property_name;
       if (identification.extent_perches) identificationUpdate.extent_perches = identification.extent_perches;
       if (identification.extent_sqm) identificationUpdate.extent_sqm = identification.extent_sqm;
+      if (identification.extent_acres) identificationUpdate.extent_acres = identification.extent_acres;
       if (identification.extent_local) identificationUpdate.extent_local = identification.extent_local;
       if (identification.boundaries) identificationUpdate.boundaries = identification.boundaries;
-      if (identification.title_owner) identificationUpdate.title_owner = identification.title_owner;
-      if (identification.deed_no) identificationUpdate.deed_no = identification.deed_no;
-      if (identification.deed_date) identificationUpdate.deed_date = identification.deed_date;
-      if (identification.notary) identificationUpdate.notary = identification.notary;
-      if (identification.interest) identificationUpdate.interest = identification.interest;
+      if (identification.ownership_type) identificationUpdate.ownership_type = identification.ownership_type;
       
       if (Object.keys(identificationUpdate).length > 0) {
         updateStepData('identification', identificationUpdate);
       }
     }
 
-    // 2. Populate Location Step
-    if (comprehensiveData.location) {
-      const location = comprehensiveData.location;
+    // 3. Populate Location Details Step
+    if (comprehensiveData.location_details) {
+      const location = comprehensiveData.location_details;
       const locationUpdate: any = {};
       
       if (location.address) locationUpdate.address = location.address;
@@ -665,9 +679,9 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 3. Populate Site Step
-    if (comprehensiveData.site) {
-      const site = comprehensiveData.site;
+    // 4. Populate Site Characteristics Step
+    if (comprehensiveData.site_characteristics) {
+      const site = comprehensiveData.site_characteristics;
       const siteUpdate: any = {};
       
       if (site.shape) siteUpdate.shape = site.shape;
@@ -697,14 +711,14 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 4. Populate Buildings Step
-    if (comprehensiveData.buildings && Array.isArray(comprehensiveData.buildings)) {
-      const buildings = comprehensiveData.buildings
+    // 5. Populate Buildings/Improvements Step
+    if (comprehensiveData.buildings_improvements && Array.isArray(comprehensiveData.buildings_improvements)) {
+      const buildings = comprehensiveData.buildings_improvements
         .filter((building: any) => building.type || building.floor_area)
         .map((building: any, index: number) => ({
           id: Date.now().toString() + index,
-          type: building.type || '',
-          use: building.use || '',
+          type: building.building_type || building.type || '',
+          use: building.primary_use || building.use || '',
           floor_area: building.floor_area || 0,
           construction_year: building.construction_year || new Date().getFullYear(),
           construction_type: building.construction_type || '',
@@ -713,7 +727,11 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
           floor_type: building.floor_type || '',
           condition: building.condition || '',
           stories: building.stories || 1,
-          description: building.description || ''
+          description: building.description || '',
+          rooms: building.rooms || {},
+          special_features: building.special_features || [],
+          renovation_required: building.renovation_required || '',
+          estimated_replacement_cost: building.estimated_replacement_cost || 0
         }));
       
       if (buildings.length > 0) {
@@ -721,9 +739,9 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 5. Populate Utilities Step
-    if (comprehensiveData.utilities) {
-      const utilities = comprehensiveData.utilities;
+    // 6. Populate Utilities Assessment Step
+    if (comprehensiveData.utilities_assessment) {
+      const utilities = comprehensiveData.utilities_assessment;
       const utilitiesUpdate: any = {};
       
       if (utilities.electricity) utilitiesUpdate.electricity = utilities.electricity;
@@ -737,9 +755,9 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 6. Populate Locality Step
-    if (comprehensiveData.locality) {
-      const locality = comprehensiveData.locality;
+    // 7. Populate Locality Analysis Step
+    if (comprehensiveData.locality_analysis) {
+      const locality = comprehensiveData.locality_analysis;
       const localityUpdate: any = {};
       
       if (locality.neighborhood_character) localityUpdate.neighborhood_character = locality.neighborhood_character;
@@ -760,9 +778,9 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 7. Populate Planning Step
-    if (comprehensiveData.planning) {
-      const planning = comprehensiveData.planning;
+    // 8. Populate Planning & Zoning Step
+    if (comprehensiveData.planning_zoning) {
+      const planning = comprehensiveData.planning_zoning;
       const planningUpdate: any = {};
       
       if (planning.zoning) planningUpdate.zoning = planning.zoning;
@@ -778,41 +796,82 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 8. Populate Transport Step
-    if (comprehensiveData.transport) {
-      const transport = comprehensiveData.transport;
+    // 8. Populate Transport & Access Step  
+    if (comprehensiveData.transport_access) {
+      const transport = comprehensiveData.transport_access;
       const transportUpdate: any = {};
       
-      if (transport.road_type) transportUpdate.road_type = transport.road_type;
-      if (transport.road_condition) transportUpdate.road_condition = transport.road_condition;
-      if (transport.road_width) transportUpdate.road_width = transport.road_width;
-      if (transport.access_quality) transportUpdate.access_quality = transport.access_quality;
-      if (transport.public_transport_available) transportUpdate.public_transport_available = transport.public_transport_available;
-      if (transport.parking_availability) transportUpdate.parking_availability = transport.parking_availability;
-      if (transport.accessibility_rating) transportUpdate.accessibility_rating = transport.accessibility_rating;
-      if (transport.transport_impact) transportUpdate.transport_impact = transport.transport_impact;
-      if (transport.transport_notes) transportUpdate.transport_notes = transport.transport_notes;
+      // Road access information
+      if (transport.road_access) {
+        transportUpdate.road_type = transport.road_access.road_type;
+        transportUpdate.road_condition = transport.road_access.road_condition;
+        transportUpdate.road_width = transport.road_access.road_width;
+        transportUpdate.main_road_name = transport.road_access.main_road_name;
+        transportUpdate.frontage_to_road = transport.road_access.frontage_to_road;
+      }
+      
+      // Public transport information
+      if (transport.public_transport) {
+        transportUpdate.bus_service = transport.public_transport.bus_service;
+        transportUpdate.nearest_bus_stop = transport.public_transport.nearest_bus_stop;
+        transportUpdate.distance_to_bus_stop = transport.public_transport.distance_to_bus_stop;
+        transportUpdate.railway_access = transport.public_transport.railway_access;
+        transportUpdate.nearest_railway_station = transport.public_transport.nearest_railway_station;
+        transportUpdate.distance_to_railway = transport.public_transport.distance_to_railway;
+      }
+      
+      // Distance information
+      if (transport.distances) {
+        transportUpdate.distance_to_town_center = transport.distances.distance_to_town_center;
+        transportUpdate.distance_to_colombo = transport.distances.distance_to_colombo;
+        transportUpdate.distance_to_airport = transport.distances.distance_to_airport;
+        transportUpdate.distance_to_main_highway = transport.distances.distance_to_main_highway;
+      }
+      
+      // Access quality
+      if (transport.vehicle_access) transportUpdate.vehicle_access = transport.vehicle_access;
+      if (transport.pedestrian_access) transportUpdate.pedestrian_access = transport.pedestrian_access;
       
       if (Object.keys(transportUpdate).length > 0) {
         updateStepData('transport', transportUpdate);
       }
     }
 
-    // 9. Populate Environmental Step
-    if (comprehensiveData.environmental) {
-      const environmental = comprehensiveData.environmental;
+    // 9. Populate Environmental Factors Step
+    if (comprehensiveData.environmental_factors) {
+      const environmental = comprehensiveData.environmental_factors;
       const environmentalUpdate: any = {};
       
-      if (environmental.nbro_clearance) environmentalUpdate.nbro_clearance = environmental.nbro_clearance;
-      if (environmental.landslide_risk) environmentalUpdate.landslide_risk = environmental.landslide_risk;
-      if (environmental.flood_risk) environmentalUpdate.flood_risk = environmental.flood_risk;
-      if (environmental.climate_zone) environmentalUpdate.climate_zone = environmental.climate_zone;
-      if (environmental.air_quality) environmentalUpdate.air_quality = environmental.air_quality;
-      if (environmental.noise_levels) environmentalUpdate.noise_levels = environmental.noise_levels;
-      if (environmental.environmental_impact) environmentalUpdate.environmental_impact = environmental.environmental_impact;
-      if (environmental.natural_hazards) environmentalUpdate.natural_hazards = environmental.natural_hazards;
-      if (environmental.environmental_restrictions) environmentalUpdate.environmental_restrictions = environmental.environmental_restrictions;
-      if (environmental.environmental_notes) environmentalUpdate.environmental_notes = environmental.environmental_notes;
+      // NBRO clearance information
+      if (environmental.nbro_clearance) {
+        environmentalUpdate.nbro_clearance = environmental.nbro_clearance.status;
+        environmentalUpdate.nbro_required = environmental.nbro_clearance.required;
+        environmentalUpdate.nbro_reference = environmental.nbro_clearance.reference_number;
+      }
+      
+      // Natural hazards assessment
+      if (environmental.natural_hazards) {
+        environmentalUpdate.flood_risk = environmental.natural_hazards.flood_risk;
+        environmentalUpdate.landslide_risk = environmental.natural_hazards.landslide_risk;
+        environmentalUpdate.earthquake_risk = environmental.natural_hazards.earthquake_risk;
+        environmentalUpdate.cyclone_risk = environmental.natural_hazards.cyclone_risk;
+      }
+      
+      // Climate factors
+      if (environmental.climate_factors) {
+        environmentalUpdate.rainfall_pattern = environmental.climate_factors.rainfall_pattern;
+        environmentalUpdate.temperature_range = environmental.climate_factors.temperature_range;
+        environmentalUpdate.humidity_level = environmental.climate_factors.humidity_level;
+        environmentalUpdate.wind_exposure = environmental.climate_factors.wind_exposure;
+      }
+      
+      // Environmental issues
+      if (environmental.environmental_issues) {
+        environmentalUpdate.air_quality = environmental.environmental_issues.air_quality;
+        environmentalUpdate.noise_pollution = environmental.environmental_issues.noise_pollution;
+        environmentalUpdate.water_pollution = environmental.environmental_issues.water_pollution;
+        environmentalUpdate.industrial_pollution = environmental.environmental_issues.industrial_pollution;
+      }
       
       if (Object.keys(environmentalUpdate).length > 0) {
         updateStepData('environmental', environmentalUpdate);
@@ -820,8 +879,8 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
     }
 
     // 10. Populate Market Analysis Step
-    if (comprehensiveData.market) {
-      const market = comprehensiveData.market;
+    if (comprehensiveData.market_analysis) {
+      const market = comprehensiveData.market_analysis;
       const marketUpdate: any = {};
       
       if (market.comparable_sales) marketUpdate.comparable_sales = market.comparable_sales;
@@ -836,9 +895,9 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
       }
     }
 
-    // 11. Populate Legal Step
-    if (comprehensiveData.legal) {
-      const legal = comprehensiveData.legal;
+    // 12. Populate Legal Information Step
+    if (comprehensiveData.legal_information) {
+      const legal = comprehensiveData.legal_information;
       const legalUpdate: any = {};
       
       if (legal.ownership_type) legalUpdate.ownership_type = legal.ownership_type;

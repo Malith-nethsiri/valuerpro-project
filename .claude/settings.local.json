@@ -48,7 +48,10 @@
       "Bash(set PUBLIC_FRONTEND_URL=https://julie-continue-constructed-need.trycloudflare.com)",
       "Bash(set PUBLIC_BACKEND_URL=https://olympic-stations-this-modification.trycloudflare.com)",
       "Bash(echo $PUBLIC_FRONTEND_URL)",
-      "Bash(echo $PUBLIC_BACKEND_URL)"
+      "Bash(echo $PUBLIC_BACKEND_URL)",
+      "Bash(npm run clean:*)",
+      "Bash(uvicorn:*)",
+      "Bash(docker system prune:*)"
     ],
     "deny": [],
     "ask": [],

@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from openai import OpenAI
 from app.core.config import settings
+from app.services.srilanka_admin_divisions import enhance_location_with_admin_divisions
 
 # Import performance optimization utilities
 try:
@@ -40,6 +41,7 @@ class DocumentType:
     SURVEY_PLAN = "survey_plan"
     DEED = "deed"
     PRIOR_VALUATION = "prior_valuation"
+    CERTIFICATE_OF_SALE = "certificate_of_sale"
     OTHER = "other"
 
 
@@ -67,11 +69,21 @@ def detect_document_type(ocr_text: str) -> str:
         "assessment", "appraisal", "estimate"
     ]
     
+    # Certificate of Sale indicators
+    certificate_of_sale_indicators = [
+        "certificate of sale", "fiscal", "auction", "upset price", "highest bidder",
+        "public auction", "sale by auction", "knocked down", "auctioneer", 
+        "certificate under", "gazette notification", "recovery of debt"
+    ]
+    
     survey_count = sum(1 for indicator in survey_indicators if indicator in text_lower)
     deed_count = sum(1 for indicator in deed_indicators if indicator in text_lower)
     valuation_count = sum(1 for indicator in valuation_indicators if indicator in text_lower)
+    certificate_count = sum(1 for indicator in certificate_of_sale_indicators if indicator in text_lower)
     
-    if survey_count >= 2:
+    if certificate_count >= 2:
+        return DocumentType.CERTIFICATE_OF_SALE
+    elif survey_count >= 2:
         return DocumentType.SURVEY_PLAN
     elif deed_count >= 2:
         return DocumentType.DEED
@@ -219,6 +231,93 @@ Return only valid JSON, no other text.
         return {"error": f"OpenAI API error: {str(e)}"}
 
 
+def extract_certificate_of_sale_data(ocr_text: str) -> Dict[str, Any]:
+    """
+    Extract structured data from Certificate of Sale OCR text using GPT-4
+    """
+    if not client:
+        return {"error": "OpenAI API key not configured"}
+    
+    prompt = f"""
+You are an expert at extracting information from Sri Lankan Certificate of Sale documents and auction records.
+Analyze the following OCR text from a certificate of sale document and extract the following information.
+If any information is not found or unclear, use null for that field.
+
+OCR Text:
+{ocr_text}
+
+Please extract and return ONLY a JSON object with these fields:
+{{
+    "certificate_number": "string or null",
+    "certificate_date": "string (YYYY-MM-DD format) or null",
+    "fiscal_officer": "string or null",
+    "auction_date": "string (YYYY-MM-DD format) or null",
+    "auction_location": "string or null",
+    "property_description": "string or null",
+    "lot_number": "string or null",
+    "plan_reference": "string or null",
+    "extent": "string or null",
+    "extent_perches": "number (convert to perches) or null",
+    "location_details": {{
+        "village": "string or null",
+        "grama_niladhari_division": "string or null",
+        "divisional_secretariat": "string or null",
+        "district": "string or null",
+        "province": "string or null"
+    }},
+    "sale_details": {{
+        "upset_price": "string or null",
+        "sale_price": "string or null",
+        "highest_bidder": "string or null",
+        "auctioneer": "string or null",
+        "conditions_of_sale": "string or null"
+    }},
+    "legal_details": {{
+        "judgment_debtor": "string or null",
+        "judgment_creditor": "string or null",
+        "case_number": "string or null",
+        "court": "string or null",
+        "gazette_notification": "string or null",
+        "writ_number": "string or null"
+    }},
+    "boundaries": {{
+        "north": "string or null",
+        "south": "string or null",
+        "east": "string or null",
+        "west": "string or null"
+    }},
+    "encumbrances": "string or null",
+    "special_conditions": "string or null",
+    "additional_notes": "string or null"
+}}
+
+Return only valid JSON, no other text.
+"""
+    
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=settings.OPENAI_MAX_TOKENS,
+            temperature=settings.OPENAI_TEMPERATURE
+        )
+        
+        result = response.choices[0].message.content.strip()
+        
+        # Clean the response - remove markdown code blocks if present
+        if result.startswith('```json'):
+            result = result.replace('```json', '').replace('```', '').strip()
+        elif result.startswith('```'):
+            result = result.replace('```', '').strip()
+        
+        return json.loads(result)
+        
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse AI response as JSON: {str(e)}", "raw_response": result}
+    except Exception as e:
+        return {"error": f"OpenAI API error: {str(e)}"}
+
+
 def extract_general_property_data(ocr_text: str) -> Dict[str, Any]:
     """
     Extract general property information from any document type
@@ -325,23 +424,46 @@ def extract_comprehensive_property_data(ocr_text: str) -> Dict[str, Any]:
         return {"error": "OpenAI API key not configured"}
     
     prompt = f"""
-You are an expert at extracting comprehensive property information from Sri Lankan property documents (survey plans, deeds, valuation reports, etc.).
-Analyze the following OCR text and extract ALL available information that would be useful for creating a detailed property valuation report.
+You are an expert at extracting comprehensive property information from Sri Lankan property documents (survey plans, deeds, valuation reports, certificate of sale, etc.).
+Analyze the following OCR text and extract ALL available information that would be useful for completing ALL 12 steps of a detailed property valuation report wizard.
+
+IMPORTANT: This data will be used to auto-populate a 12-step valuation wizard covering:
+1. Report Information
+2. Property Identification  
+3. Location Details
+4. Site Characteristics
+5. Legal Information
+6. Locality Analysis
+7. Planning & Zoning
+8. Utilities Assessment
+9. Transport & Access
+10. Environmental Factors
+11. Market Analysis
+12. Appendices
 
 OCR Text:
 {ocr_text}
 
-Please extract and return ONLY a JSON object with these comprehensive fields:
+Please extract and return ONLY a JSON object with these comprehensive fields organized by wizard steps:
 {{
-    "identification": {{
+    "report_information": {{
+        "client_name": "string or null",
+        "property_owner": "string or null", 
+        "valuation_purpose": "string or null",
+        "inspection_date": "string (YYYY-MM-DD format) or null",
+        "report_date": "string (YYYY-MM-DD format) or null"
+    }},
+    "property_identification": {{
         "lot_number": "string or null",
         "plan_number": "string or null", 
         "plan_date": "string (YYYY-MM-DD format) or null",
         "surveyor_name": "string or null",
         "licensed_surveyor_number": "string or null",
         "land_name": "string or null",
+        "property_name": "string or null",
         "extent_perches": "number or null",
         "extent_sqm": "number or null",
+        "extent_acres": "number or null",
         "extent_local": "string or null (e.g. '2A-3R-15.5P')",
         "boundaries": {{
             "north": "string or null",
@@ -349,13 +471,9 @@ Please extract and return ONLY a JSON object with these comprehensive fields:
             "east": "string or null",
             "west": "string or null"
         }},
-        "title_owner": "string or null",
-        "deed_no": "string or null",
-        "deed_date": "string (YYYY-MM-DD format) or null",
-        "notary": "string or null",
-        "interest": "string (freehold/leasehold) or null"
+        "ownership_type": "string (freehold/leasehold/permit/other) or null"
     }},
-    "location": {{
+    "location_details": {{
         "address": {{
             "house_number": "string or null",
             "street": "string or null",
@@ -368,128 +486,220 @@ Please extract and return ONLY a JSON object with these comprehensive fields:
         "province": "string or null",
         "latitude": "number or null",
         "longitude": "number or null",
-        "road_access": "string or null",
-        "road_width": "number or null",
         "nearest_landmark": "string or null",
-        "directions": "string or null",
-        "public_transport": "string or null",
-        "distance_to_town": "number or null",
-        "distance_to_colombo": "number or null",
-        "nearest_railway_station": "string or null"
+        "directions_to_property": "string or null"
     }},
-    "site": {{
+    "site_characteristics": {{
         "shape": "string or null",
-        "frontage": "number or null",
-        "depth": "number or null", 
+        "frontage": "number (meters) or null",
+        "depth": "number (meters) or null", 
         "aspect": "string or null",
-        "topography": "string or null",
-        "gradient": "number or null",
-        "level_relative_to_road": "string or null",
-        "elevation_difference": "number or null",
+        "topography": "string (flat/sloping/hilly) or null",
+        "gradient": "string or null",
+        "level_relative_to_road": "string (above/level/below) or null",
         "soil_type": "string or null",
-        "drainage": "string or null",
-        "flood_risk": "string or null",
-        "bearing_capacity": "string or null",
-        "soil_notes": "string or null",
-        "site_features": ["list of features or empty array"],
-        "other_features": "string or null",
-        "noise_level": "string or null",
-        "air_quality": "string or null",
-        "environmental_issues": "string or null",
-        "pedestrian_access": "string or null",
-        "vehicle_access": "string or null",
-        "access_notes": "string or null"
+        "drainage": "string (excellent/good/fair/poor) or null",
+        "flood_risk": "string (none/low/medium/high) or null",
+        "site_features": ["list of notable features or empty array"],
+        "environmental_issues": "string or null"
     }},
-    "buildings": [
-        {{
-            "type": "string or null",
-            "use": "string or null",
-            "floor_area": "number or null",
-            "construction_year": "number or null",
-            "construction_type": "string or null",
-            "roof_type": "string or null",
-            "wall_type": "string or null",
-            "floor_type": "string or null", 
-            "condition": "string or null",
-            "stories": "number or null",
-            "description": "string or null"
-        }}
-    ],
-    "utilities": {{
-        "electricity": {{
-            "available": "string (yes/nearby/no) or null",
-            "type": "string or null", 
-            "connection_status": "string or null",
-            "provider": "string or null",
-            "account_number": "string or null"
-        }},
-        "water": {{
-            "main_source": "string or null",
-            "quality": "string or null",
-            "reliability": "string or null",
-            "provider": "string or null"
-        }},
-        "telecom": {{
-            "fixed_line": "boolean or null",
-            "mobile_coverage": "boolean or null", 
-            "broadband": "boolean or null",
-            "providers": "string or null"
-        }},
-        "sewerage": {{
-            "type": "string or null",
-            "condition": "string or null"
-        }},
-        "drainage": {{
-            "surface": "string or null",
-            "storm_water": "string or null"
-        }}
+    "legal_information": {{
+        "title_owner": "string or null",
+        "deed_number": "string or null",
+        "deed_date": "string (YYYY-MM-DD format) or null",
+        "notary": "string or null",
+        "encumbrances": "string or null",
+        "restrictions": "string or null",
+        "easements": "string or null",
+        "mortgage_details": "string or null",
+        "legal_issues": "string or null"
     }},
-    "locality": {{
+    "locality_analysis": {{
         "neighborhood_character": "string or null",
         "development_stage": "string or null",
-        "property_types": ["list of property types or empty array"],
-        "commercial_activities": ["list of activities or empty array"],
-        "schools": ["list of schools or empty array"],
-        "hospitals": ["list of hospitals or empty array"],
-        "banks": ["list of banks or empty array"],
-        "markets": ["list of markets or empty array"],
-        "religious_places": ["list of places or empty array"],
+        "property_types": ["list of property types in area or empty array"],
+        "schools": ["list of nearby schools or empty array"],
+        "hospitals": ["list of nearby hospitals or empty array"],
+        "banks": ["list of nearby banks or empty array"],
+        "markets": ["list of nearby markets or empty array"],
+        "religious_places": ["list of places of worship or empty array"],
         "recreational_facilities": ["list of facilities or empty array"],
-        "security_situation": "string or null",
-        "future_development": "string or null"
+        "commercial_activities": "string or null",
+        "security_situation": "string or null"
     }},
-    "planning": {{
+    "planning_zoning": {{
         "zoning": "string or null",
-        "permitted_uses": ["list of uses or empty array"],
-        "building_height_limit": "number or null",
+        "permitted_uses": ["list of permitted uses or empty array"],
+        "building_height_limit": "string or null",
         "setback_requirements": {{
-            "front": "number or null",
-            "rear": "number or null",
-            "side": "number or null"
+            "front": "number (meters) or null",
+            "rear": "number (meters) or null",
+            "side": "number (meters) or null"
         }},
         "floor_area_ratio": "number or null",
         "coverage_ratio": "number or null",
         "special_conditions": "string or null"
     }},
-    "legal": {{
-        "ownership_type": "string or null",
-        "encumbrances": "string or null",
-        "restrictions": "string or null",
-        "easements": "string or null",
-        "pending_litigation": "string or null",
-        "statutory_approvals": "string or null"
+    "utilities_assessment": {{
+        "electricity": {{
+            "available": "string (available/nearby/not_available) or null",
+            "connection_type": "string (single_phase/three_phase) or null", 
+            "connection_status": "string (connected/disconnected/ready) or null",
+            "provider": "string (CEB/LECO/other) or null",
+            "account_number": "string or null"
+        }},
+        "water": {{
+            "main_source": "string (mains/well/borehole/spring/none) or null",
+            "quality": "string (excellent/good/fair/poor) or null",
+            "reliability": "string (continuous/intermittent/seasonal) or null",
+            "provider": "string (NWSDB/local_authority/private) or null"
+        }},
+        "telecommunications": {{
+            "fixed_line": "boolean or null",
+            "mobile_coverage": "string (excellent/good/fair/poor) or null", 
+            "broadband": "boolean or null",
+            "fiber_optic": "boolean or null",
+            "providers": "string or null"
+        }},
+        "sewerage": {{
+            "type": "string (mains_sewer/septic_tank/soakage_pit/none) or null",
+            "condition": "string (excellent/good/fair/poor) or null"
+        }},
+        "drainage": {{
+            "surface_drainage": "string (excellent/good/fair/poor) or null",
+            "storm_water_management": "string or null"
+        }},
+        "other_utilities": {{
+            "gas_connection": "boolean or null",
+            "garbage_collection": "boolean or null",
+            "street_lighting": "boolean or null"
+        }}
+    }},
+    "transport_access": {{
+        "road_access": {{
+            "main_road_name": "string or null",
+            "road_type": "string (paved/gravel/earth) or null",
+            "road_width": "number (meters) or null",
+            "road_condition": "string (excellent/good/fair/poor) or null",
+            "frontage_to_road": "number (meters) or null"
+        }},
+        "public_transport": {{
+            "bus_service": "string (frequent/occasional/none) or null",
+            "nearest_bus_stop": "string or null",
+            "distance_to_bus_stop": "number (meters) or null",
+            "railway_access": "string or null",
+            "nearest_railway_station": "string or null",
+            "distance_to_railway": "number (km) or null"
+        }},
+        "distances": {{
+            "distance_to_town_center": "number (km) or null",
+            "distance_to_colombo": "number (km) or null",
+            "distance_to_airport": "number (km) or null",
+            "distance_to_main_highway": "number (km) or null"
+        }},
+        "vehicle_access": "string (excellent/good/fair/poor/none) or null",
+        "pedestrian_access": "string (excellent/good/fair/poor) or null"
+    }},
+    "environmental_factors": {{
+        "nbro_clearance": {{
+            "required": "boolean or null",
+            "status": "string (obtained/pending/not_required) or null",
+            "reference_number": "string or null"
+        }},
+        "natural_hazards": {{
+            "flood_risk": "string (none/low/medium/high) or null",
+            "landslide_risk": "string (none/low/medium/high) or null",
+            "earthquake_risk": "string (none/low/medium/high) or null",
+            "cyclone_risk": "string (none/low/medium/high) or null"
+        }},
+        "climate_factors": {{
+            "rainfall_pattern": "string or null",
+            "temperature_range": "string or null",
+            "humidity_level": "string or null",
+            "wind_exposure": "string or null"
+        }},
+        "environmental_issues": {{
+            "air_quality": "string (excellent/good/fair/poor) or null",
+            "noise_pollution": "string (none/low/moderate/high) or null",
+            "water_pollution": "string (none/low/moderate/high) or null",
+            "industrial_pollution": "string or null"
+        }}
+    }},
+    "market_analysis": {{
+        "comparable_sales": [
+            {{
+                "address": "string or null",
+                "sale_date": "string (YYYY-MM-DD format) or null",
+                "sale_price": "number or null",
+                "land_extent": "number (perches) or null",
+                "property_type": "string or null",
+                "distance_from_subject": "number (km) or null"
+            }}
+        ],
+        "market_trends": {{
+            "price_trend": "string (increasing/stable/decreasing) or null",
+            "demand_level": "string (high/moderate/low) or null",
+            "supply_level": "string (limited/adequate/excess) or null",
+            "market_activity": "string (active/moderate/slow) or null"
+        }},
+        "value_indicators": {{
+            "land_value_per_perch": "number or null",
+            "construction_cost_per_sqft": "number or null",
+            "rental_yield": "number (percentage) or null"
+        }}
+    }},
+    "buildings_improvements": [
+        {{
+            "building_type": "string (house/apartment/commercial/industrial) or null",
+            "primary_use": "string or null",
+            "floor_area": "number (sq ft) or null",
+            "construction_year": "number or null",
+            "construction_type": "string (masonry/timber/steel/concrete) or null",
+            "roof_type": "string (tile/sheet/concrete/other) or null",
+            "wall_type": "string (brick/block/timber/other) or null",
+            "floor_type": "string (cement/tile/timber/other) or null",
+            "condition": "string (excellent/good/fair/poor) or null",
+            "stories": "number or null",
+            "rooms": {{
+                "bedrooms": "number or null",
+                "bathrooms": "number or null",
+                "living_rooms": "number or null",
+                "kitchen": "number or null",
+                "other_rooms": "number or null"
+            }},
+            "special_features": ["list of features or empty array"],
+            "renovation_required": "string or null",
+            "estimated_replacement_cost": "number or null"
+        }}
+    ],
+    "appendices_references": {{
+        "supporting_documents": ["list of document types mentioned or empty array"],
+        "photographs": ["list of photo descriptions or empty array"],
+        "maps_plans": ["list of maps/plans referenced or empty array"],
+        "certificates": ["list of certificates mentioned or empty array"],
+        "approvals": ["list of approvals referenced or empty array"],
+        "inspection_notes": "string or null",
+        "additional_information": "string or null",
+        "data_sources": ["list of data sources or empty array"],
+        "limitations": "string or null",
+        "assumptions": "string or null"
     }}
 }}
 
-Instructions:
-- Extract ALL available information, don't limit to just survey plan data
-- Look for building descriptions, construction details, amenities mentioned
-- Identify utilities mentioned (electricity account numbers, water connections, etc.)
-- Extract neighborhood information, nearby facilities mentioned
-- Identify any legal restrictions, encumbrances, or special conditions
-- For coordinates, look for GPS coordinates, survey coordinates, or location references
-- For areas, convert between different units (perches, sq.m, acres, etc.) 
-- Be comprehensive but accurate - only include information clearly stated in the document
+CRITICAL EXTRACTION GUIDELINES:
+1. Extract EVERY piece of relevant information found in the document
+2. Convert all measurements to consistent units (perches for land, sq ft for buildings, meters for distances)
+3. Parse dates in YYYY-MM-DD format
+4. Look for building descriptions, construction details, amenities mentioned
+5. Identify utilities mentioned (account numbers, connections, providers)
+6. Extract neighborhood info, nearby facilities, landmarks
+7. Identify legal restrictions, encumbrances, special conditions
+8. For coordinates, extract GPS coordinates, survey coordinates, or location references
+9. Be comprehensive but accurate - only include information clearly stated in the document
+10. For Certificate of Sale documents, focus on auction details, legal proceedings, and property descriptions
+11. For Survey Plans, emphasize measurements, boundaries, and surveyor details
+12. For Deeds, focus on ownership transfer, legal descriptions, and conditions
+13. Cross-reference information where multiple document types provide the same data
 
 Return only valid JSON, no other text.
 """
@@ -661,6 +871,55 @@ Instructions:
         return {"error": f"Utilities extraction failed: {str(e)}"}
 
 
+def enhance_coordinates_with_admin_divisions(extracted_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Enhance extracted coordinates with Sri Lankan administrative divisions
+    
+    Args:
+        extracted_data: Data extracted from documents
+        
+    Returns:
+        Enhanced data with administrative divisions
+    """
+    try:
+        # Look for coordinates in the comprehensive data structure
+        coords = None
+        
+        if 'comprehensive_data' in extracted_data:
+            comp_data = extracted_data['comprehensive_data']
+            if comp_data.get('location_details'):
+                loc = comp_data['location_details']
+                if loc.get('latitude') and loc.get('longitude'):
+                    coords = (loc['latitude'], loc['longitude'])
+        
+        if coords:
+            lat, lng = coords
+            # Validate coordinates are reasonable for Sri Lanka
+            if 5.9 <= lat <= 9.9 and 79.6 <= lng <= 82.0:
+                enhanced_location = enhance_location_with_admin_divisions(lat, lng)
+                
+                # Merge the enhanced admin data into the extracted data
+                enhanced_loc = enhanced_location.get('enhanced_location', {})
+                sri_admin = enhanced_location.get('sri_lanka_admin', {})
+                
+                # Add Sri Lankan administrative divisions
+                extracted_data['comprehensive_data']['location_details'].update({
+                    'district': enhanced_loc.get('district') or sri_admin.get('district'),
+                    'ds_division': enhanced_loc.get('ds_division') or sri_admin.get('ds_division'),
+                    'gn_division': enhanced_loc.get('gn_division') or sri_admin.get('gn_division'),
+                    'province': enhanced_loc.get('province') or sri_admin.get('province')
+                })
+                
+                logging.info(f"Enhanced coordinates ({lat}, {lng}) with admin divisions: "
+                           f"{enhanced_loc.get('district')}, {enhanced_loc.get('ds_division')}")
+        
+        return extracted_data
+        
+    except Exception as e:
+        logging.warning(f"Failed to enhance coordinates with admin divisions: {str(e)}")
+        return extracted_data
+
+
 def process_document_with_ai(ocr_text: str, document_type: Optional[str] = None) -> Dict[str, Any]:
     """
     Main function to process a document with AI extraction including translation
@@ -709,6 +968,10 @@ def process_document_with_ai(ocr_text: str, document_type: Optional[str] = None)
     # Extract comprehensive data for all wizard steps (NEW ENHANCED VERSION)
     try:
         result["comprehensive_data"] = extract_comprehensive_property_data(processed_text)
+        
+        # Enhance with Sri Lankan administrative divisions if coordinates are found
+        result = enhance_coordinates_with_admin_divisions(result)
+        
     except Exception as e:
         result["comprehensive_data"] = {"error": f"Comprehensive extraction failed: {str(e)}"}
     
@@ -718,6 +981,8 @@ def process_document_with_ai(ocr_text: str, document_type: Optional[str] = None)
             result["extracted_data"] = extract_survey_plan_data(processed_text)
         elif document_type == DocumentType.DEED:
             result["extracted_data"] = extract_deed_data(processed_text)
+        elif document_type == DocumentType.CERTIFICATE_OF_SALE:
+            result["extracted_data"] = extract_certificate_of_sale_data(processed_text)
         else:
             # For other document types, try general extraction
             result["extracted_data"] = {"type": "other", "note": "Document type not specifically supported"}
