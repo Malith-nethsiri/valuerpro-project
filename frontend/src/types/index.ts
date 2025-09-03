@@ -1,871 +1,246 @@
-// Core Types for ValuerPro Application
+// Re-export all types from domain-specific modules
+// This maintains backward compatibility while providing better organization
 
-export interface ValuerProfile {
+// User and Authentication Types
+export * from './user';
+
+// Report and Valuation Types
+export * from './report';
+
+// Property Types
+export * from './property';
+
+// API Types
+export * from './api';
+
+// Common/Shared Types
+export interface BaseEntity {
   id: string;
-  user_id: string;
-  // Basic professional details
-  titles?: string;
-  full_name?: string;
-  designation?: string;
-  qualifications?: string[];
-  panels?: string[];
-  // Registration & Membership
-  registration_no?: string;
-  membership_status?: string;
-  // Company Information
-  company_name?: string;
-  firm_address?: string;
-  // Contact information
-  address?: string;
-  phones?: string[];
-  contact_phones?: string[];
-  email?: string;
-  contact_email?: string;
-  // Professional Standards & Insurance
-  default_standards?: string;
-  indemnity_status?: string;
-  // Default Legal Content (to reuse across reports)
-  default_disclaimers?: string;
-  default_certificate?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  valuer_profile?: ValuerProfile;
-}
+export interface TimestampedEntity extends BaseEntity {}
 
-export interface Client {
-  id: string;
-  name: string;
-  address?: string;
-  contact_numbers?: string[];
-  email?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Report {
-  id: string;
-  ref?: string;
-  purpose?: string;
-  basis_of_value?: string;
-  report_type?: string;
-  status: ReportStatus;
-  report_date?: string;
-  inspection_date?: string;
-  finalized_at?: string;
-  currency?: string;
-  fsv_percentage?: number;
-  created_at: string;
-  updated_at: string;
-  author_id?: string;
-  client_id?: string;
-  author?: User;
-  client?: Client;
-}
-
-export type ReportStatus = 'draft' | 'in_progress' | 'completed' | 'finalized';
-
-export interface Property {
-  id: string;
-  report_id: string;
-  property_index: number;
-  property_type: string;
-  created_at: string;
-  updated_at: string;
-  identification?: Identification;
-  location?: Location;
-}
-
-export interface Identification {
-  id: string;
-  property_id: string;
-  lot_number?: string;
-  plan_number?: string;
-  plan_date?: string;
-  surveyor_name?: string;
-  land_name?: string;
-  extent_perches?: number;
-  extent_sqm?: number;
-  extent_local?: string;
-  boundaries?: Record<string, any>;
-  title_owner?: string;
-  deed_no?: string;
-  deed_date?: string;
-  notary?: string;
-  interest?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Location {
-  id: string;
-  property_id: string;
-  address_full?: string;
-  village?: string;
-  gn_division?: string;
-  ds_division?: string;
-  district?: string;
-  province?: string;
-  lat?: number;
-  lng?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ValuationLine {
-  id: string;
-  property_id: string;
-  line_type: string;
-  description: string;
-  quantity: number;
-  unit: string;
-  rate: number;
-  depreciation_pct: number;
-  value: number;
+export interface SortableEntity {
   sort_order: number;
-  created_at: string;
-  updated_at: string;
 }
 
-export interface ValuationSummary {
-  id: string;
-  report_id: string;
-  market_value: number;
-  market_value_words: string;
-  forced_sale_value: number;
-  created_at: string;
-  updated_at: string;
+export interface MetaData {
+  total?: number;
+  page?: number;
+  limit?: number;
+  has_next?: boolean;
+  has_prev?: boolean;
 }
 
-export interface ReportData {
-  property_info?: PropertyInfo;
-  location_data?: LocationData;
-  ai_analysis?: AIAnalysis;
-  uploaded_files?: UploadedFile[];
-  property_details?: PropertyDetails;
-  valuation?: ValuationData;
-  market_analysis?: MarketAnalysis;
-  comparables?: Comparable[];
+export interface SelectOption {
+  value: string | number;
+  label: string;
+  disabled?: boolean;
+  icon?: string;
 }
 
-export interface PropertyInfo {
-  lot_number?: string;
-  plan_number?: string;
-  plan_date?: string;
-  surveyor_name?: string;
-  land_name?: string;
-  extent?: string;
-  boundaries?: Boundaries;
-  coordinates?: Coordinates;
-  scale?: string;
+export interface TableColumn<T = any> {
+  key: keyof T | string;
+  label: string;
+  sortable?: boolean;
+  width?: string | number;
+  render?: (value: any, record: T) => React.ReactNode;
+  align?: 'left' | 'center' | 'right';
 }
 
-export interface Boundaries {
-  north?: string;
-  south?: string;
-  east?: string;
-  west?: string;
-}
-
-export interface Coordinates {
-  latitude?: number;
-  longitude?: number;
-}
-
-export interface LocationData {
-  coordinates?: Coordinates;
-  formatted_address?: string;
-  components?: AddressComponents;
-  static_map_url?: string;
-  access_route?: RouteDescription;
-  analysis_complete?: boolean;
-}
-
-export interface AddressComponents {
-  area?: string;
-  city?: string;
-  district?: string;
-  province?: string;
-  country?: string;
-}
-
-export interface RouteDescription {
-  description?: string;
-  distance?: string;
-  duration?: string;
-  start_address?: string;
-  end_address?: string;
-}
-
-export interface AIAnalysis {
-  document_type?: DocumentType;
-  extracted_data?: ExtractedData;
-  general_data?: GeneralPropertyData;
-  processing_status?: string;
-}
-
-export type DocumentType = 'survey_plan' | 'deed' | 'prior_valuation' | 'other';
-
-export interface ExtractedData {
-  // Survey Plan specific
-  lot_number?: string;
-  plan_number?: string;
-  plan_date?: string;
-  surveyor_name?: string;
-  land_name?: string;
-  extent?: string;
-  boundaries?: Boundaries;
-  coordinates?: Coordinates;
-  scale?: string;
-  
-  // Deed specific
-  deed_number?: string;
-  deed_date?: string;
-  notary_attorney?: string;
-  parties?: {
-    vendor?: string;
-    purchaser?: string;
-  };
-  consideration_amount?: string;
-  
-  // Common
-  additional_notes?: string;
-}
-
-export interface GeneralPropertyData {
-  property_address?: string;
-  location_details?: {
-    village?: string;
-    grama_niladhari_division?: string;
-    district?: string;
-    province?: string;
-  };
-  owner_name?: string;
-  property_type?: string;
-  building_details?: BuildingDetails;
-  utilities?: Utilities;
-  access_road?: string;
-  landmarks?: string[];
-  additional_features?: string[];
-}
-
-export interface BuildingDetails {
-  type?: string;
-  floors?: number;
-  area?: string;
-  construction_year?: string;
-}
-
-export interface Utilities {
-  electricity?: boolean;
-  water?: boolean;
-  telephone?: boolean;
-}
-
-export interface PropertyDetails {
-  [key: string]: unknown;
-}
-
-export interface ValuationData {
-  land_value?: number;
-  building_value?: number;
-  total_market_value?: number;
-  forced_sale_value?: number;
-  insurance_value?: number;
-  valuation_date?: string;
-  components?: ValuationComponent[];
-}
-
-export interface ValuationComponent {
-  description: string;
-  quantity?: number;
-  unit?: string;
-  rate?: number;
-  value: number;
-}
-
-export interface MarketAnalysis {
-  [key: string]: unknown;
-}
-
-export interface Comparable {
-  id?: string;
-  address?: string;
-  sale_price?: number;
-  sale_date?: string;
-  property_type?: string;
-  area?: number;
-  price_per_unit?: number;
-}
-
-export interface UploadedFile {
-  file_id: string;
-  filename: string;
-  original_filename: string;
-  path: string;
-  mime_type: string;
-  size: number;
-  report_id?: string;
-  uploaded_at: string;
-  aiAnalysis?: AIAnalysis;
-}
-
-export interface OCRResult {
-  id: string;
-  full_text?: string;
-  pages_data?: OCRPageData[];
-  confidence_score?: number;
-  processing_time?: number;
-  ocr_engine: string;
-  language_detected?: string;
-  edited_text?: string;
-  is_edited: boolean;
-  file_id: string;
-  processed_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface OCRPageData {
-  page: number;
-  text: string;
-}
-
-// API Response Types
-export interface APIResponse<T = unknown> {
-  data?: T;
-  message?: string;
-  error?: string;
-}
-
-export interface LoginResponse {
-  access_token: string;
-  token_type: string;
-}
-
-export interface FileUploadResponse {
-  file_id: string;
-  filename: string;
-  original_filename: string;
-  path: string;
-  mime_type: string;
-  size: number;
-  report_id?: string;
-  uploaded_at: string;
-}
-
-// Error Types
-export interface APIError {
-  detail: string;
-  status_code?: number;
-}
-
-export interface ValidationError {
-  field: string;
-  message: string;
-}
-
-// Form Types
-export interface LoginFormData extends Record<string, unknown> {
-  email: string;
-  password: string;
-}
-
-export interface RegisterFormData {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  full_name: string;
-  role?: string;
-}
-
-export interface ValuerProfileFormData {
-  // Basic professional details
-  titles?: string;
-  full_name?: string;
-  designation?: string;
-  qualifications?: string[];
-  panels?: string[];
-  // Registration & Membership
-  registration_no?: string;
-  membership_status?: string;
-  // Company Information
-  company_name?: string;
-  firm_address?: string;
-  // Contact information
-  address?: string;
-  phones?: string[];
-  contact_phones?: string[];
-  email?: string;
-  contact_email?: string;
-  // Professional Standards & Insurance
-  default_standards?: string;
-  indemnity_status?: string;
-  // Default Legal Content (to reuse across reports)
-  default_disclaimers?: string;
-  default_certificate?: string;
-}
-
-export interface ReportWizardData {
-  // Step 1: Report Info
-  reportInfo: {
-    ref?: string;
-    purpose?: string;
-    client_id?: string;
-    report_date?: string;
-    inspection_date?: string;
-    basis_of_value?: string;
-    currency?: string;
-  };
-  
-  // Step 2: Identification & Title
-  identification: {
-    lot_number?: string;
-    plan_number?: string;
-    plan_date?: string;
-    surveyor_name?: string;
-    land_name?: string;
-    extent_perches?: number;
-    extent_sqm?: number;
-    extent_local?: string;
-    boundaries?: Record<string, string>;
-    title_owner?: string;
-    deed_no?: string;
-    deed_date?: string;
-    notary?: string;
-    interest?: string;
-  };
-  
-  // Step 3: Location & Access
-  location: {
-    address?: {
-      house_number?: string;
-      street?: string;
-      city?: string;
-      postal_code?: string;
-    };
-    gn_division?: string;
-    ds_division?: string;
-    district?: string;
-    province?: string;
-    latitude?: string;
-    longitude?: string;
-    road_access?: string;
-    road_width?: number;
-    nearest_landmark?: string;
-    directions?: string;
-    public_transport?: string;
-    distance_to_town?: number;
-    distance_to_colombo?: number;
-    nearest_railway_station?: string;
-  };
-  
-  // Step 4: Site Description
-  site: {
-    shape?: string;
-    frontage?: number;
-    depth?: number;
-    aspect?: string;
-    topography?: string;
-    gradient?: number;
-    level_relative_to_road?: string;
-    elevation_difference?: number;
-    soil_type?: string;
-    drainage?: string;
-    flood_risk?: string;
-    bearing_capacity?: string;
-    soil_notes?: string;
-    site_features?: string[];
-    other_features?: string;
-    noise_level?: string;
-    air_quality?: string;
-    environmental_issues?: string;
-    pedestrian_access?: string;
-    vehicle_access?: string;
-    access_notes?: string;
-  };
-  
-  // Step 5: Buildings
-  buildings: {
-    id: string;
-    type: string;
-    use: string;
-    floor_area: number;
-    construction_year: number;
-    construction_type: string;
-    roof_type: string;
-    wall_type: string;
-    floor_type: string;
-    condition: string;
-    stories: number;
-    description: string;
-    replacement_cost_per_sqft?: number;
-    depreciation_rate?: number;
-    current_value?: number;
-  }[];
-  
-  // Step 6: Utilities
-  utilities: {
-    electricity?: {
-      available?: string;
-      type?: string;
-      connection_status?: string;
-      notes?: string;
-    };
-    water?: {
-      main_source?: string;
-      quality?: string;
-      reliability?: string;
-      storage_capacity?: number;
-      notes?: string;
-    };
-    telecom?: {
-      fixed_line?: boolean;
-      mobile_coverage?: boolean;
-      broadband?: boolean;
-      fiber_optic?: boolean;
-      cable_tv?: boolean;
-      internet_speed?: number;
-      providers?: string;
-    };
-    sewerage?: {
-      type?: string;
-      condition?: string;
-    };
-    drainage?: {
-      surface?: string;
-      storm_water?: string;
-      notes?: string;
-    };
-    other?: {
-      gas_connection?: boolean;
-      garbage_collection?: boolean;
-      street_lighting?: boolean;
-      security_services?: boolean;
-      postal_service?: boolean;
-      fire_hydrant?: boolean;
-      additional_notes?: string;
-    };
-    overall_rating?: string;
-    value_impact?: string;
-    assessment_summary?: string;
-  };
-  
-  // Step 7: Planning/Zoning
-  planning: {
-    zoning_classification?: string;
-    planning_authority?: string;
-    development_plan?: string;
-    current_use?: string;
-    development_potential?: string;
-    additional_uses?: string;
-    max_height?: number;
-    max_floors?: number;
-    floor_area_ratio?: number;
-    building_coverage?: number;
-    front_setback?: number;
-    side_setbacks?: number;
-    rear_setback?: number;
-    parking_requirements?: string;
-    landscaping_percentage?: number;
-    restrictions?: string[];
-    road_reservation?: string;
-    utility_easements?: string;
-    other_restrictions?: string;
-    planning_approval?: string;
-    building_approval?: string;
-    environmental_clearance?: string;
-    compliance_rating?: string;
-    compliance_notes?: string;
-    development_feasibility?: string;
-    value_impact?: string;
-    planning_summary?: string;
-  };
-  
-  // Step 8: Transport & Access
-  transport: {
-    road_type?: string;
-    road_condition?: string;
-    road_width?: number;
-    access_width?: number;
-    access_quality?: string;
-    distance_to_main_road?: number;
-    public_transport_available?: boolean;
-    nearest_bus_stop?: number;
-    nearest_railway_station?: string;
-    distance_to_railway?: number;
-    nearest_airport?: string;
-    distance_to_airport?: number;
-    parking_availability?: string;
-    traffic_conditions?: string;
-    accessibility_rating?: string;
-    transport_impact?: string;
-    transport_notes?: string;
-  };
-  
-  // Step 9: Environmental Factors
-  environmental: {
-    nbro_clearance?: string;
-    landslide_risk?: string;
-    flood_risk?: string;
-    erosion_risk?: string;
-    earthquake_zone?: string;
-    climate_zone?: string;
-    average_rainfall?: number;
-    temperature_range?: string;
-    wind_patterns?: string;
-    natural_hazards?: string[];
-    environmental_restrictions?: string[];
-    conservation_area?: boolean;
-    wetland_proximity?: string;
-    forest_reserve_proximity?: string;
-    coastal_proximity?: string;
-    river_proximity?: string;
-    industrial_proximity?: string;
-    pollution_sources?: string[];
-    air_quality?: string;
-    noise_levels?: string;
-    soil_contamination?: string;
-    water_quality?: string;
-    environmental_clearances?: string[];
-    protected_species?: boolean;
-    archaeological_significance?: boolean;
-    environmental_impact?: string;
-    sustainability_features?: string[];
-    environmental_notes?: string;
-  };
-  
-  // Step 10: Market Analysis  
-  market: {
-    comparable_sales?: {
-      id: string;
-      address: string;
-      distance_km: number;
-      sale_date: string;
-      sale_price: number;
-      price_per_perch: number;
-      land_extent: number;
-      building_area?: number;
-      property_type: string;
-      condition: string;
-      adjustments: {
-        location: number;
-        time: number;
-        size: number;
-        condition: number;
-        other: number;
-        total: number;
-      };
-      adjusted_price_per_perch: number;
-      notes?: string;
-    }[];
-    rental_comparables?: {
-      id: string;
-      address: string;
-      monthly_rent: number;
-      property_type: string;
-      building_area: number;
-      rental_yield: number;
-    }[];
-    market_trends?: {
-      area_growth_rate?: number;
-      price_trend_direction?: string;
-      market_activity?: string;
-      average_selling_period?: number;
-      price_volatility?: string;
-      demand_supply_balance?: string;
-    };
-    price_analysis?: {
-      comparable_range_low?: number;
-      comparable_range_high?: number;
-      average_price_per_perch?: number;
-      median_price_per_perch?: number;
-      subject_property_position?: string;
-      pricing_rationale?: string;
-    };
-    market_influences?: {
-      economic_factors?: string[];
-      infrastructure_developments?: string[];
-      zoning_changes?: string[];
-      demographic_changes?: string[];
-      seasonal_factors?: string[];
-    };
-    forecast?: {
-      short_term_outlook?: string;
-      medium_term_outlook?: string;
-      growth_drivers?: string[];
-      risk_factors?: string[];
-    };
-    market_summary?: string;
-  };
-
-  // Step 11: Locality
-  locality: {
-    area_type?: string;
-    development_stage?: string;
-    socioeconomic_level?: string;
-    property_mix?: string;
-    neighborhood_description?: string;
-    nearby_amenities?: string[];
-    distance_to_school?: number;
-    distance_to_hospital?: number;
-    distance_to_shopping?: number;
-    amenity_rating?: string;
-    market_activity?: string;
-    price_trend?: string;
-    selling_period?: string;
-    rental_market?: string;
-    price_range_per_perch?: string;
-    rental_yield_range?: string;
-    growth_potential?: string;
-    infrastructure_development?: string;
-    planned_developments?: string;
-    safety_level?: string;
-    traffic_level?: string;
-    environmental_issues?: string;
-    overall_rating?: string;
-    value_impact?: string;
-    market_analysis_summary?: string;
-  };
-  
-  // Step 12: Valuation
-  valuation: {
-    method?: string;
-    valuation_date?: string;
-    lines?: {
-      id: string;
-      description: string;
-      quantity: number;
-      unit: string;
-      rate: number;
-      depreciation_pct: number;
-      value: number;
-      line_type: string;
-    }[];
-    summary?: {
-      land_value?: number;
-      building_value?: number;
-      improvement_value?: number;
-      market_value?: number;
-      market_value_words?: string;
-      forced_sale_value?: number;
-      fsv_percentage?: number;
-    };
-    land_rate_justification?: string;
-    building_rate_justification?: string;
-    valuation_comments?: string;
-  };
-  
-  // Step 13: Legal & Disclaimers
-  legal: {
-    assumptions?: string[];
-    additional_assumptions?: string;
-    disclaimers?: string;
-    certificate?: string;
-    valuation_standards?: string;
-    indemnity_insurance?: string;
-    membership_status?: string;
-    registration_number?: string;
-    valuer_name?: string;
-    designation?: string;
-    company_name?: string;
-    report_date?: string;
-    firm_address?: string;
-    contact_phones?: string;
-    contact_email?: string;
-    report_classification?: string;
-    validity_period?: string;
-    report_status?: string;
-    special_limitations?: string;
-  };
-  
-  // Step 14: Appendices
-  appendices: {
-    files?: {
-      id: string;
-      file_name: string;
-      file_size: number;
-      file_type: string;
-      upload_date: string;
-      category: string;
-      description: string;
-      file_url?: string;
-      processing_status: 'pending' | 'processing' | 'completed' | 'failed';
-    }[];
-    photos?: {
-      id: string;
-      file_name: string;
-      file_size: number;
-      file_type: string;
-      upload_date: string;
-      category: string;
-      description: string;
-      file_url?: string;
-      processing_status: 'pending' | 'processing' | 'completed' | 'failed';
-    }[];
-    location_map_url?: string;
-    satellite_map_url?: string;
-    numbering_style?: string;
-    page_layout?: string;
-    instructions?: string;
-  };
-  
-  // Step 15: Review & Generate
-  review: {
-    validation_errors?: string[];
-    completion_status?: Record<string, boolean>;
-    final_notes?: string;
-    ready_to_generate?: boolean;
+export interface FormField {
+  name: string;
+  label: string;
+  type: 'text' | 'email' | 'password' | 'number' | 'select' | 'textarea' | 'date' | 'checkbox' | 'radio' | 'file';
+  required?: boolean;
+  placeholder?: string;
+  options?: SelectOption[];
+  validation?: {
+    min?: number;
+    max?: number;
+    pattern?: RegExp;
+    custom?: (value: any) => string | undefined;
   };
 }
 
-export interface ReportFormData {
-  ref?: string;
-  purpose?: string;
-  basis_of_value?: string;
-  report_type?: string;
-  status?: string;
-  report_date?: string;
-  inspection_date?: string;
-  currency?: string;
-  fsv_percentage?: number;
-  client_id?: string;
-}
-
-// Component Prop Types
-export interface FileUploadProps {
-  onFilesUploaded?: (files: UploadedFile[]) => void;
-  multiple?: boolean;
-  acceptedTypes?: string[];
-  maxSize?: number;
-  reportId?: string;
-}
-
-export interface PropertyLocationMapProps {
-  aiAnalysis?: AIAnalysis;
-  onLocationUpdate?: (locationData: LocationData) => void;
-}
-
-export interface AIAnalysisModalProps {
-  analysis?: AIAnalysis;
+export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
+  title?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  closeOnOverlay?: boolean;
+}
+
+export interface LoadingState {
+  isLoading: boolean;
+  error?: string | null;
+  lastUpdated?: Date;
+}
+
+export interface Theme {
+  primary: string;
+  secondary: string;
+  success: string;
+  warning: string;
+  error: string;
+  info: string;
+  light: string;
+  dark: string;
+}
+
+export interface AppConfig {
+  apiUrl: string;
+  environment: 'development' | 'staging' | 'production';
+  version: string;
+  features: {
+    enableAI: boolean;
+    enableOCR: boolean;
+    enableMaps: boolean;
+    enableAnalytics: boolean;
+  };
+  limits: {
+    maxFileSize: number;
+    maxFilesPerUpload: number;
+    maxReportsPerUser: number;
+  };
 }
 
 // Utility Types
-export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
-export interface AsyncState<T> {
-  data?: T;
-  loading: boolean;
-  error?: string;
+export type RequiredOnly<T, K extends keyof T> = Pick<T, K>;
+
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+export type Prettify<T> = {
+  [K in keyof T]: T[K];
+} & {};
+
+export type NonEmptyArray<T> = [T, ...T[]];
+
+export type StringKeys<T> = {
+  [K in keyof T]: T[K] extends string ? K : never;
+}[keyof T];
+
+export type ValueOf<T> = T[keyof T];
+
+export type KeysOfType<T, U> = {
+  [K in keyof T]: T[K] extends U ? K : never;
+}[keyof T];
+
+// Event Handler Types
+export type EventHandler<T = Event> = (event: T) => void;
+
+export type ChangeHandler<T = HTMLInputElement> = (event: React.ChangeEvent<T>) => void;
+
+export type SubmitHandler<T = HTMLFormElement> = (event: React.FormEvent<T>) => void;
+
+// Status Types
+export type Status = 'idle' | 'loading' | 'success' | 'error';
+
+export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export type ValidationStatus = 'valid' | 'invalid' | 'pending' | 'skipped';
+
+// Permission Types
+export type Permission = 'read' | 'write' | 'delete' | 'admin';
+
+export type Role = 'user' | 'admin' | 'super_admin' | 'valuer' | 'client';
+
+export interface UserPermissions {
+  reports: Permission[];
+  files: Permission[];
+  clients: Permission[];
+  settings: Permission[];
+  users: Permission[];
 }
+
+// Navigation Types
+export interface NavigationItem {
+  id: string;
+  label: string;
+  path: string;
+  icon?: string;
+  children?: NavigationItem[];
+  requiresAuth?: boolean;
+  permissions?: Permission[];
+  exact?: boolean;
+}
+
+export interface BreadcrumbItem {
+  label: string;
+  path?: string;
+  isActive?: boolean;
+}
+
+// Chart/Analytics Types
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+  color?: string;
+}
+
+export interface TimeSeriesPoint {
+  timestamp: string;
+  value: number;
+  label?: string;
+}
+
+export interface ChartConfig {
+  type: 'line' | 'bar' | 'pie' | 'area' | 'scatter';
+  data: ChartDataPoint[] | TimeSeriesPoint[];
+  options?: {
+    responsive?: boolean;
+    maintainAspectRatio?: boolean;
+    legend?: boolean;
+    grid?: boolean;
+    animations?: boolean;
+  };
+}
+
+// Notification Types
+export interface Notification {
+  id: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  title: string;
+  message: string;
+  duration?: number;
+  actions?: NotificationAction[];
+  timestamp: Date;
+  read: boolean;
+}
+
+export interface NotificationAction {
+  label: string;
+  action: () => void;
+  variant?: 'primary' | 'secondary';
+}
+
+// Search and Filter Types
+export interface SearchFilter {
+  field: string;
+  operator: 'equals' | 'contains' | 'starts_with' | 'ends_with' | 'greater_than' | 'less_than' | 'in' | 'not_in';
+  value: any;
+}
+
+export interface SortConfig {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface SearchQuery {
+  query?: string;
+  filters?: SearchFilter[];
+  sort?: SortConfig;
+  page?: number;
+  limit?: number;
+}
+
+// Export format types for backward compatibility
+export type { User, Client, Report, ReportStatus, Property, ValuationLine, ValuationSummary } from './user';
+export type { Identification, Location } from './property';
+export type { ApiResponse, ApiError, FileUpload, OCRResult } from './api';

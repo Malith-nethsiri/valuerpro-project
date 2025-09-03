@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.api.api_v1.api import api_router
 from app.middleware.security import SecurityMiddleware
 from app.middleware.rate_limiting import RateLimitMiddleware
+from app.middleware.error_handling import ErrorHandlingMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -68,6 +69,9 @@ app = FastAPI(
         "name": "Proprietary",
     },
 )
+
+# Error Handling Middleware - Must be first to catch all errors
+app.add_middleware(ErrorHandlingMiddleware)
 
 # Security Middleware - Add security headers
 app.add_middleware(SecurityMiddleware)

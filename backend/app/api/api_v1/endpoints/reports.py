@@ -33,6 +33,20 @@ def create_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    """
+    Create a new client record.
+    
+    Args:
+        client_in: Client data including name, contact information, and type
+        db: Database session dependency
+        current_user: Authenticated user creating the client
+        
+    Returns:
+        ClientSchema: The created client with generated ID and timestamps
+        
+    Raises:
+        HTTPException: If database operation fails or validation errors occur
+    """
     client_data = client_in.model_dump()
     client_data["author_id"] = current_user.id  # Associate with current user
     client = Client(**client_data)
@@ -49,6 +63,18 @@ def list_clients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    """
+    Retrieve a paginated list of clients for the current user.
+    
+    Args:
+        skip: Number of records to skip (pagination offset)
+        limit: Maximum number of records to return (max 100)
+        db: Database session dependency
+        current_user: Authenticated user whose clients to retrieve
+        
+    Returns:
+        List[ClientSchema]: List of client records owned by the current user
+    """
     # Filter clients by current user
     clients = db.query(Client).filter(Client.author_id == current_user.id).offset(skip).limit(limit).all()
     return clients
@@ -60,6 +86,20 @@ def get_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    """
+    Retrieve a specific client by ID.
+    
+    Args:
+        client_id: Unique identifier of the client to retrieve
+        db: Database session dependency
+        current_user: Authenticated user (must own the client)
+        
+    Returns:
+        ClientSchema: The requested client record
+        
+    Raises:
+        HTTPException: 404 if client not found or not owned by current user
+    """
     client = db.query(Client).filter(
         Client.id == client_id, 
         Client.author_id == current_user.id
@@ -76,6 +116,21 @@ def update_client(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    """
+    Update an existing client record.
+    
+    Args:
+        client_id: Unique identifier of the client to update
+        client_in: Updated client data
+        db: Database session dependency
+        current_user: Authenticated user (must own the client)
+        
+    Returns:
+        ClientSchema: The updated client record
+        
+    Raises:
+        HTTPException: 404 if client not found or not owned by current user
+    """
     client = db.query(Client).filter(
         Client.id == client_id, 
         Client.author_id == current_user.id

@@ -108,3 +108,8 @@ postgres-data/
 *secret*
 *password*
 *passwd*
+
+# Large binaries - should be distributed separately
+cloudflared.exe
+cloudflared
+*.exe

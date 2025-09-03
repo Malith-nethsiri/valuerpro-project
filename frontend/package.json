@@ -23,11 +23,13 @@
     "@heroicons/react": "^2.2.0",
     "@playwright/test": "^1.55.0",
     "axios": "^1.6.0",
+    "immer": "^10.0.3",
     "js-cookie": "^3.0.5",
     "next": "15.5.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-dropzone": "^14.3.8"
+    "react-dropzone": "^14.3.8",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
