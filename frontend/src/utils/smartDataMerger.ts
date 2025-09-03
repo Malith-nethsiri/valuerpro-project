@@ -44,9 +44,15 @@ export class SmartDataMerger {
     };
 
     try {
+      // Debug logging
+      console.log('SmartDataMerger.mergeAiData called with:', JSON.stringify(aiData, null, 2));
+      
       // Check if we have comprehensive AI data
       const comprehensiveData = aiData?.document_analysis?.comprehensive_data || 
                                aiData?.comprehensive_data;
+
+      console.log('Extracted comprehensiveData:', comprehensiveData);
+      console.log('Has error?', comprehensiveData?.error);
 
       if (comprehensiveData && !comprehensiveData.error) {
         // Use new comprehensive format

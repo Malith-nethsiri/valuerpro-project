@@ -21,8 +21,7 @@ export const metadata: Metadata = {
   creator: "ValuerPro",
   publisher: "ValuerPro",
   robots: "index, follow",
-  viewport: "width=device-width, initial-scale=1",
-  themeColor: "#2563eb",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3003'),
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -45,6 +44,12 @@ export const metadata: Metadata = {
     description: "Professional property valuation report system with AI assistance.",
     images: ["/og-image.png"],
   },
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#2563eb',
 };
 
 export default function RootLayout({

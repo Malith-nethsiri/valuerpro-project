@@ -32,9 +32,10 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-
+    
     // Validate form
-    if (!validate()) {
+    const isValid = validate();
+    if (!isValid) {
       setError('Please fix the errors below');
       return;
     }

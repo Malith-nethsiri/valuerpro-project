@@ -5,7 +5,7 @@ import ErrorDisplay from '@/components/ui/ErrorDisplay';
 import { useStepValidation } from '@/hooks/useFieldValidation';
 import { validationSchemas } from '@/hooks/useFieldValidation';
 import { filesAPI, ocrAPI } from '@/lib/api';
-import MultiFileUpload from '@/components/MultiFileUpload';
+import MultiFileUpload from '@/components/forms/MultiFileUpload';
 
 export const IdentificationStep = () => {
   const { state, updateStepData, validateStep, populateFromAiAnalysis } = useWizard();
@@ -61,17 +61,15 @@ export const IdentificationStep = () => {
     setAnalyzing(true);
     try {
       // Process multiple files with batch OCR
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const batchResponse = await fetch(`${API_BASE_URL}/api/v1/batch-ocr/batch-process`, {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+      const batchResponse = await fetch(`${API_BASE_URL}/ocr/batch_extract_text`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
-          file_ids: fileIds,
-          consolidate_analysis: true,
-          auto_populate: true,
+          file_ids: fileIds
         }),
       });
 
@@ -82,52 +80,102 @@ export const IdentificationStep = () => {
       const batchResult = await batchResponse.json();
       
       // DEBUG: Log the full batch result for analysis
-      console.log('=== FULL BATCH RESULT DEBUG ===');
+      console.log('=== BATCH OCR RESULT DEBUG ===');
       console.log('Batch result:', JSON.stringify(batchResult, null, 2));
       
-      // Process results from all files
+      // Process results from all files - NEW API FORMAT
       let successfulFiles: any[] = [];
       let hasComprehensiveData = false;
       
-      if (batchResult.files && batchResult.files.length > 0) {
-        successfulFiles = batchResult.files.filter((f: any) => f.success);
-        console.log('Batch result files:', batchResult.files);
+      if (batchResult.results && batchResult.results.length > 0) {
+        successfulFiles = batchResult.results.filter((f: any) => !f.error);
+        console.log('Batch result files:', batchResult.results);
         console.log('Successful files:', successfulFiles);
         
         if (successfulFiles.length > 0) {
-          // Check if we have comprehensive data - use SmartDataMerger approach
+          // Check if we have comprehensive data from the NEW API format
           console.log('=== CHECKING FOR COMPREHENSIVE DATA ===');
           for (let i = 0; i < successfulFiles.length; i++) {
             const file = successfulFiles[i];
             console.log(`File ${i + 1}:`, {
               filename: file.filename,
-              has_ai_analysis: !!file.ai_analysis,
-              has_comprehensive_data: !!file.ai_analysis?.comprehensive_data,
-              comprehensive_data_error: file.ai_analysis?.comprehensive_data?.error,
-              comprehensive_data_keys: file.ai_analysis?.comprehensive_data ? Object.keys(file.ai_analysis.comprehensive_data) : null
+              has_ai_extracted_data: !!file.ai_extracted_data,
+              document_type: file.document_type,
+              extracted_text_length: file.extracted_text?.length || 0,
+              ai_data_keys: file.ai_extracted_data ? Object.keys(file.ai_extracted_data) : null
             });
           }
           
           hasComprehensiveData = successfulFiles.some(f => 
-            f.ai_analysis?.comprehensive_data && !f.ai_analysis.comprehensive_data.error
+            f.ai_extracted_data && !f.ai_extracted_data.error
           );
           
           console.log('Has comprehensive data overall:', hasComprehensiveData);
           
           if (hasComprehensiveData) {
-            // Use comprehensive data via wizard's populateFromAiAnalysis
-            console.log('Using comprehensive data format for AI population');
+            // SIMPLE DIRECT APPROACH - Just populate the form fields directly
+            console.log('🚀 DIRECT FORM POPULATION - Bypassing complex merger');
             const firstFileWithComp = successfulFiles.find(f => 
-              f.ai_analysis?.comprehensive_data && !f.ai_analysis.comprehensive_data.error
+              f.ai_extracted_data && !f.ai_extracted_data.error
             );
+            
             if (firstFileWithComp) {
-              populateFromAiAnalysis({ comprehensive_data: firstFileWithComp.ai_analysis.comprehensive_data });
-              console.log('Applied comprehensive data to all wizard steps');
+              const data = firstFileWithComp.ai_extracted_data;
+              console.log('📋 Raw data received:', JSON.stringify(data, null, 2));
+              
+              // DIRECT FIELD MAPPING - No complex processing
+              const updates: any = {};
+              
+              // DEBUGGING: Let's see exactly what data structure we have
+              console.log('🔍 DEBUGGING - Raw data received:', data);
+              console.log('🔍 DEBUGGING - data keys:', Object.keys(data || {}));
+              console.log('🔍 DEBUGGING - data.property_identification:', data?.property_identification);
+              console.log('🔍 DEBUGGING - Direct data fields:', {
+                lot_number: data?.lot_number,
+                plan_number: data?.plan_number,
+                surveyor_name: data?.surveyor_name,
+                extent_perches: data?.extent_perches
+              });
+              
+              // Check both nested and flat structures
+              const propId = data.property_identification || data;
+              const location = data.location_details || data.location || {};
+              const legal = data.legal_information || data;
+              
+              console.log('🔍 DEBUGGING - After structure check:');
+              console.log('  - propId:', propId);
+              console.log('  - legal:', legal);
+              console.log('  - propId.lot_number:', propId?.lot_number);
+              console.log('  - propId.plan_number:', propId?.plan_number);
+              
+              // Map the fields directly
+              if (propId.lot_number) updates.lot_number = propId.lot_number;
+              if (propId.plan_number) updates.plan_number = propId.plan_number;
+              if (propId.extent_perches) updates.extent_perches = propId.extent_perches;
+              if (propId.boundaries) updates.boundaries = propId.boundaries;
+              if (propId.surveyor_name || legal.surveyor_name) {
+                updates.surveyor_name = propId.surveyor_name || legal.surveyor_name;
+              }
+              if (propId.land_name) updates.land_name = propId.land_name;
+              if (propId.plan_date || legal.plan_date) {
+                updates.plan_date = propId.plan_date || legal.plan_date;
+              }
+              
+              console.log('📝 Direct updates to apply:', updates);
+              
+              // Apply updates directly - ONE BIG UPDATE
+              if (Object.keys(updates).length > 0) {
+                console.log('🔥 APPLYING ALL UPDATES AT ONCE:', updates);
+                updateStepData('identification', updates);
+                console.log('✅ DONE - All fields updated in one call');
+              } else {
+                console.log('❌ NO UPDATES TO APPLY - Check data structure!');
+              }
             }
           } else {
-            // Fallback to legacy format for preview/manual application
+            // Fallback to parsing data for preview/manual application
             const extracted = parseExtractedDataFromBatch(batchResult);
-            console.log('Using legacy data format - parsed:', extracted);
+            console.log('Using fallback data parsing - parsed:', extracted);
             setExtractedData(extracted);
             setShowExtractedData(true);
           }
@@ -135,13 +183,13 @@ export const IdentificationStep = () => {
       }
       
       // Use consolidated analysis if available and no comprehensive data was already applied
-      if (batchResult.consolidated_analysis && !hasComprehensiveData) {
-        const consolidated = parseConsolidatedData(batchResult.consolidated_analysis);
-        console.log('Consolidated analysis:', batchResult.consolidated_analysis);
+      if (batchResult.consolidated_data && !hasComprehensiveData) {
+        const consolidated = parseConsolidatedData(batchResult.consolidated_data);
+        console.log('Consolidated analysis:', batchResult.consolidated_data);
         console.log('Parsed consolidated data:', consolidated);
         setExtractedData(consolidated);
         setShowExtractedData(true);
-      } else if (batchResult.consolidated_analysis && hasComprehensiveData) {
+      } else if (batchResult.consolidated_data && hasComprehensiveData) {
         console.log('Skipping consolidated analysis - comprehensive data already applied');
       }
       
@@ -153,47 +201,52 @@ export const IdentificationStep = () => {
     }
   };
 
-  // Parse extracted data from batch OCR results
+  // Parse extracted data from batch OCR results (NEW FORMAT)
   const parseExtractedDataFromBatch = (batchResult: any) => {
     const extracted: any = {};
     
     // Find the best data from successful files
-    const successfulFiles = batchResult.files.filter((f: any) => f.success);
+    const successfulFiles = batchResult.results.filter((f: any) => !f.error && f.ai_extracted_data);
     
     for (const file of successfulFiles) {
-      if (file.ai_analysis?.extracted_data) {
-        const data = file.ai_analysis.extracted_data;
-        const general = file.ai_analysis.general_data || {};
-        
-        // Merge data from all files, prioritizing survey plans
-        if (file.document_type === 'survey_plan' || !extracted.lot_number) {
-          Object.assign(extracted, {
-            lot_number: data.lot_number || extracted.lot_number,
-            plan_number: data.plan_number || extracted.plan_number,
-            plan_date: data.plan_date || extracted.plan_date,
-            surveyor_name: data.surveyor_name || extracted.surveyor_name,
-            extent_perches: data.extent_perches || extracted.extent_perches,
-            extent_sqm: data.extent_square_meters || extracted.extent_sqm,
-            boundaries: data.boundaries || extracted.boundaries,
-            location: data.location || extracted.location,
-          });
-        }
-        
-        // Add deed information if available
-        if (file.document_type === 'deed') {
-          Object.assign(extracted, {
-            deed_number: data.deed_number || extracted.deed_number,
-            deed_date: data.deed_date || extracted.deed_date,
-            parties: data.parties || extracted.parties,
-            property_description: data.property_description || extracted.property_description,
-          });
-        }
-        
-        // Add general property info
+      const aiData = file.ai_extracted_data;
+      
+      // Handle both comprehensive and specific extracted data
+      let data = {};
+      if (aiData.property_identification) {
+        // Use comprehensive data structure
+        data = {
+          lot_number: aiData.property_identification.lot_number,
+          plan_number: aiData.property_identification.plan_number,
+          plan_date: aiData.property_identification.plan_date,
+          surveyor_name: aiData.property_identification.surveyor_name,
+          extent_perches: aiData.property_identification.extent_perches,
+          boundaries: aiData.property_identification.boundaries,
+          location: aiData.location_details,
+        };
+      } else {
+        // Use specific extracted data
+        data = aiData.extracted_data || aiData;
+      }
+      
+      // Merge data from all files, prioritizing survey plans
+      if (file.document_type === 'survey_plan' || !extracted.lot_number) {
         Object.assign(extracted, {
-          property_address: general.property_address || extracted.property_address,
-          owner_name: general.owner_name || extracted.owner_name,
-          property_type: general.property_type || extracted.property_type,
+          lot_number: data.lot_number || extracted.lot_number,
+          plan_number: data.plan_number || extracted.plan_number,
+          plan_date: data.plan_date || extracted.plan_date,
+          surveyor_name: data.surveyor_name || extracted.surveyor_name,
+          extent_perches: data.extent_perches || extracted.extent_perches,
+          boundaries: data.boundaries || extracted.boundaries,
+          location: data.location || extracted.location,
+        });
+      }
+      
+      // Add deed information if available
+      if (file.document_type === 'deed' && aiData.legal_information) {
+        Object.assign(extracted, {
+          deed_number: aiData.legal_information.deed_number || extracted.deed_number,
+          deed_date: aiData.legal_information.deed_date || extracted.deed_date,
         });
       }
     }

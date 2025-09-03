@@ -61,7 +61,12 @@
       "Bash(./cloudflared.exe tunnel --url http://localhost:3003)",
       "Bash(docker-compose:*)",
       "Bash(node:*)",
-      "Bash(./cloudflared.exe tunnel:*)"
+      "Bash(./cloudflared.exe tunnel:*)",
+      "Bash(grep:*)",
+      "Bash(docker:*)",
+      "Bash(\"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\")",
+      "Bash(netstat:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": [],

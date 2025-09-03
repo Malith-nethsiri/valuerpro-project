@@ -294,3 +294,107 @@ def validate_sort_field(field: str, allowed_fields: List[str]) -> str:
             detail=f"Invalid sort field. Allowed fields: {', '.join(allowed_fields)}"
         )
     return field
+
+# Import required modules for middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+# Security headers middleware
+class SecurityMiddleware(BaseHTTPMiddleware):
+    """Comprehensive security middleware with headers and validation"""
+    
+    def __init__(self, app):
+        super().__init__(app)
+    
+    async def dispatch(self, request: Request, call_next) -> Response:
+        # Pre-request security checks
+        self._validate_request_security(request)
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Add security headers
+        self._add_security_headers(response, request)
+        
+        return response
+    
+    def _validate_request_security(self, request: Request) -> None:
+        """Validate request for security issues"""
+        # Check for common attack patterns in URL
+        dangerous_patterns = [
+            '../', '..\\', 
+            '<script', '</script>',
+            'javascript:', 'vbscript:',
+            'data:text/html',
+            'eval(', 'alert(',
+        ]
+        
+        url_path = str(request.url)
+        for pattern in dangerous_patterns:
+            if pattern.lower() in url_path.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Request contains suspicious patterns"
+                )
+        
+        # Validate request size
+        content_length = request.headers.get('content-length')
+        if content_length:
+            try:
+                size = int(content_length)
+                max_size = 100 * 1024 * 1024  # 100MB
+                if size > max_size:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Request too large. Maximum {max_size // (1024*1024)}MB allowed."
+                    )
+            except ValueError:
+                pass
+    
+    def _add_security_headers(self, response: Response, request: Request) -> None:
+        """Add comprehensive security headers"""
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+        
+        # XSS protection
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        
+        # HSTS (only for HTTPS)
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        
+        # Referrer policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # Content Security Policy
+        csp_directives = [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com",
+            "img-src 'self' data: https:",
+            "connect-src 'self'",
+            "frame-ancestors 'none'",
+        ]
+        response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
+        
+        # Permissions policy
+        permissions_policy = [
+            "geolocation=(self)",
+            "microphone=()",
+            "camera=()",
+            "payment=()",
+            "usb=()",
+        ]
+        response.headers["Permissions-Policy"] = ", ".join(permissions_policy)
+        
+        # Remove server header for security
+        if "server" in response.headers:
+            del response.headers["server"]
+        
+        # Add custom security headers
+        response.headers["X-Powered-By"] = "ValuerPro"
+        response.headers["X-API-Version"] = "2.0.0"

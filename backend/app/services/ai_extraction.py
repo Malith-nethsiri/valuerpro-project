@@ -923,6 +923,7 @@ def enhance_coordinates_with_admin_divisions(extracted_data: Dict[str, Any]) -> 
 def process_document_with_ai(ocr_text: str, document_type: Optional[str] = None) -> Dict[str, Any]:
     """
     Main function to process a document with AI extraction including translation
+    Falls back to rule-based extraction if AI services fail
     """
     from app.services.translation import process_mixed_language_text, detect_language, is_translation_available
     
@@ -936,7 +937,10 @@ def process_document_with_ai(ocr_text: str, document_type: Optional[str] = None)
             "original_language": None,
             "was_translated": False,
             "translation_available": is_translation_available()
-        }
+        },
+        "ai_available": bool(client),
+        "quota_exceeded": False,
+        "fallback_used": None
     }
     
     # Handle translation if service is available
@@ -965,40 +969,116 @@ def process_document_with_ai(ocr_text: str, document_type: Optional[str] = None)
         document_type = detect_document_type(processed_text)
         result["document_type"] = document_type
     
+    # Check if AI services are available
+    ai_extraction_failed = False
+    quota_exceeded = False
+    
     # Extract comprehensive data for all wizard steps (NEW ENHANCED VERSION)
     try:
-        result["comprehensive_data"] = extract_comprehensive_property_data(processed_text)
-        
-        # Enhance with Sri Lankan administrative divisions if coordinates are found
-        result = enhance_coordinates_with_admin_divisions(result)
-        
+        if client:  # Only try AI if client is available
+            result["comprehensive_data"] = extract_comprehensive_property_data(processed_text)
+            
+            # Check for quota exceeded errors
+            if result["comprehensive_data"].get("error") and "insufficient" in result["comprehensive_data"]["error"].lower():
+                quota_exceeded = True
+                ai_extraction_failed = True
+                result["quota_exceeded"] = True
+                logger.warning("OpenAI quota exceeded, falling back to rule-based extraction")
+            else:
+                # Enhance with Sri Lankan administrative divisions if coordinates are found
+                result = enhance_coordinates_with_admin_divisions(result)
+        else:
+            ai_extraction_failed = True
+            
     except Exception as e:
+        error_msg = str(e).lower()
+        if "insufficient" in error_msg or "quota" in error_msg or "exceeded" in error_msg:
+            quota_exceeded = True
+            result["quota_exceeded"] = True
+            logger.warning("OpenAI quota exceeded, falling back to rule-based extraction")
+        
+        logger.warning(f"AI comprehensive extraction failed: {str(e)}")
+        ai_extraction_failed = True
         result["comprehensive_data"] = {"error": f"Comprehensive extraction failed: {str(e)}"}
     
     # Extract specific data based on document type using processed (translated) text
     try:
-        if document_type == DocumentType.SURVEY_PLAN:
-            result["extracted_data"] = extract_survey_plan_data(processed_text)
-        elif document_type == DocumentType.DEED:
-            result["extracted_data"] = extract_deed_data(processed_text)
-        elif document_type == DocumentType.CERTIFICATE_OF_SALE:
-            result["extracted_data"] = extract_certificate_of_sale_data(processed_text)
+        if client and not ai_extraction_failed:  # Try AI first if available
+            if document_type == DocumentType.SURVEY_PLAN:
+                result["extracted_data"] = extract_survey_plan_data(processed_text)
+            elif document_type == DocumentType.DEED:
+                result["extracted_data"] = extract_deed_data(processed_text)
+            elif document_type == DocumentType.CERTIFICATE_OF_SALE:
+                result["extracted_data"] = extract_certificate_of_sale_data(processed_text)
+            else:
+                # For other document types, try general extraction
+                result["extracted_data"] = {"type": "other", "note": "Document type not specifically supported"}
         else:
-            # For other document types, try general extraction
-            result["extracted_data"] = {"type": "other", "note": "Document type not specifically supported"}
+            ai_extraction_failed = True
+            
     except Exception as e:
+        error_msg = str(e).lower()
+        if "insufficient" in error_msg or "quota" in error_msg:
+            quota_exceeded = True
+            result["quota_exceeded"] = True
+        
+        logger.warning(f"AI specific extraction failed: {str(e)}")
+        ai_extraction_failed = True
         result["extracted_data"] = {"error": f"Data extraction failed: {str(e)}"}
     
     # Always extract general property data using processed text
     try:
-        result["general_data"] = extract_general_property_data(processed_text)
+        if client and not ai_extraction_failed:
+            result["general_data"] = extract_general_property_data(processed_text)
+        else:
+            ai_extraction_failed = True
     except Exception as e:
+        error_msg = str(e).lower()
+        if "insufficient" in error_msg or "quota" in error_msg:
+            quota_exceeded = True
+            result["quota_exceeded"] = True
+            
+        logger.warning(f"AI general extraction failed: {str(e)}")
+        ai_extraction_failed = True
         result["general_data"] = {"error": f"General data extraction failed: {str(e)}"}
     
     # Extract detailed utilities data using processed text
     try:
-        result["utilities_data"] = extract_utilities_data(processed_text)
+        if client and not ai_extraction_failed:
+            result["utilities_data"] = extract_utilities_data(processed_text)
+        else:
+            ai_extraction_failed = True
     except Exception as e:
+        error_msg = str(e).lower()
+        if "insufficient" in error_msg or "quota" in error_msg:
+            quota_exceeded = True
+            result["quota_exceeded"] = True
+            
+        logger.warning(f"AI utilities extraction failed: {str(e)}")
+        ai_extraction_failed = True
         result["utilities_data"] = {"error": f"Utilities extraction failed: {str(e)}"}
+    
+    # FALLBACK: Use rule-based extraction if AI fails
+    if ai_extraction_failed or not client:
+        fallback_reason = "OpenAI quota exceeded" if quota_exceeded else "AI services unavailable"
+        logger.info(f"Using rule-based extraction as fallback: {fallback_reason}")
+        
+        try:
+            from app.services.rule_based_extraction import extract_with_rules
+            
+            rule_result = extract_with_rules(processed_text, document_type)
+            
+            # Merge rule-based results with existing results, preserving structure
+            result["comprehensive_data"] = rule_result
+            result["extracted_data"] = rule_result
+            result["general_data"] = rule_result
+            result["fallback_used"] = "rule_based"
+            result["fallback_reason"] = fallback_reason
+            
+            logger.info("Rule-based extraction completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Rule-based extraction also failed: {str(e)}")
+            result["fallback_error"] = str(e)
     
     return result

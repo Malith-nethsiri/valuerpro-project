@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authAPI } from '@/lib/api';
-import { validatePasswordStrength } from '@/lib/error-handler';
+import { validatePassword } from '@/lib/error-handler';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -32,9 +32,9 @@ export default function RegisterPage() {
       [name]: value,
     });
     
-    // Validate password strength in real-time
+    // Validate password in real-time
     if (name === 'password') {
-      const passwordValidation = validatePasswordStrength(value);
+      const passwordValidation = validatePassword(value);
       setPasswordError(passwordValidation || '');
     }
   };
@@ -44,8 +44,8 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
 
-    // Validate password strength
-    const passwordValidation = validatePasswordStrength(formData.password);
+    // Validate password
+    const passwordValidation = validatePassword(formData.password);
     if (passwordValidation) {
       setPasswordError(passwordValidation);
       setError('Please fix the password requirements below');
@@ -60,7 +60,14 @@ export default function RegisterPage() {
     }
 
     try {
-      const { confirmPassword, ...submitData } = formData;
+      const { confirmPassword, ...formFields } = formData;
+      
+      // Convert experience_years to number if provided
+      const submitData = {
+        ...formFields,
+        experience_years: formFields.experience_years ? parseInt(formFields.experience_years) : undefined
+      };
+      
       await authAPI.register(submitData);
       
       // Redirect to login with success message

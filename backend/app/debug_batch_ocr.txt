@@ -3,88 +3,26 @@
 OCR text length: 1344 characters
 OCR text sample (first 200 chars): 'P.B.Dissanayake FSI\nLicensed Surveyor Leveller\n& Court Commissioner,\n234/10, Wilgoda Road\nKurunegala.\nTel: 037-2233036\n2016-11-16\nදිනය 51 / 16 6 * ප්\u200dරාදේශිය සභාව\nවරකාපොල\nKM.N PRIYANTHI\nSECRETARY\nWara'
 Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
+AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'ai_available', 'utilities_data']
+Comprehensive data error: OpenAI API error: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
 
 === BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.35.40_fe988f12.jpg ===
 OCR text length: 2346 characters
 OCR text sample (first 200 chars): 'Alt\nName: R.G.3.A. RANDENIYA LLB (Movie)\nAttorney-at-Law & Notary Public\nCommissioner for Oeths\nDuplicates Homagame\nSerial No: R0522\nJurisdiction Golombo\nPRIOR REGISTRATION: K54/138 and K 202/100 (Keg'
 Detected document type: deed
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
+AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'ai_available', 'utilities_data']
+Comprehensive data error: OpenAI API error: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
 
 === BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.36.04_72e0c4fc.jpg ===
 OCR text length: 2105 characters
 OCR text sample (first 200 chars): "KEERTHI GOONATHILAKE\nNOW KNOW YE THAT WE\nSHYAMA MARSHANI VIJEROON\nSecretary\nDirector\nand\nto the Board of Directors of the People's Bank by virtue and in the exercise of the\npowers in us vested in this"
 Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
+AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'ai_available', 'utilities_data']
+Comprehensive data error: OpenAI API error: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
 
 === BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.37.09_db7702ef.jpg ===
 OCR text length: 1333 characters
 OCR text sample (first 200 chars): 'P.B.Dissanayake F.S.L\nLicensed Surveyor Leveller\n& Court Commissioner,\n234/10, Wilgoda Road\nKurunegala.\nTel: 037-2233036\nඈනුමත කරම්.\n2016-07-\nදිගය.\n1.5.2./16... ප්\u200dරාදේශීය සභාව\nවරකාපොල\nK.M.N.PRIYANTH\n'
 Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for test_document.pdf ===
-OCR text length: 0 characters
-OCR text sample (first 200 chars): ''
-Detected document type: other
-OCR text is empty - skipping AI analysis
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-23 at 14.06.29_f6a499a4.jpg ===
-OCR text length: 1344 characters
-OCR text sample (first 200 chars): 'P.B.Dissanayake FSI\nLicensed Surveyor Leveller\n& Court Commissioner,\n234/10, Wilgoda Road\nKurunegala.\nTel: 037-2233036\n2016-11-16\nදිනය 51 / 16 6 * ප්\u200dරාදේශිය සභාව\nවරකාපොල\nKM.N PRIYANTHI\nSECRETARY\nWara'
-Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.35.40_fe988f12.jpg ===
-OCR text length: 2346 characters
-OCR text sample (first 200 chars): 'Alt\nName: R.G.3.A. RANDENIYA LLB (Movie)\nAttorney-at-Law & Notary Public\nCommissioner for Oeths\nDuplicates Homagame\nSerial No: R0522\nJurisdiction Golombo\nPRIOR REGISTRATION: K54/138 and K 202/100 (Keg'
-Detected document type: deed
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.36.04_72e0c4fc.jpg ===
-OCR text length: 2105 characters
-OCR text sample (first 200 chars): "KEERTHI GOONATHILAKE\nNOW KNOW YE THAT WE\nSHYAMA MARSHANI VIJEROON\nSecretary\nDirector\nand\nto the Board of Directors of the People's Bank by virtue and in the exercise of the\npowers in us vested in this"
-Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.37.09_db7702ef.jpg ===
-OCR text length: 1333 characters
-OCR text sample (first 200 chars): 'P.B.Dissanayake F.S.L\nLicensed Surveyor Leveller\n& Court Commissioner,\n234/10, Wilgoda Road\nKurunegala.\nTel: 037-2233036\nඈනුමත කරම්.\n2016-07-\nදිගය.\n1.5.2./16... ප්\u200dරාදේශීය සභාව\nවරකාපොල\nK.M.N.PRIYANTH\n'
-Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-23 at 14.06.29_f6a499a4.jpg ===
-OCR text length: 1344 characters
-OCR text sample (first 200 chars): 'P.B.Dissanayake FSI\nLicensed Surveyor Leveller\n& Court Commissioner,\n234/10, Wilgoda Road\nKurunegala.\nTel: 037-2233036\n2016-11-16\nදිනය 51 / 16 6 * ප්\u200dරාදේශිය සභාව\nවරකාපොල\nKM.N PRIYANTHI\nSECRETARY\nWara'
-Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.35.40_fe988f12.jpg ===
-OCR text length: 2346 characters
-OCR text sample (first 200 chars): 'Alt\nName: R.G.3.A. RANDENIYA LLB (Movie)\nAttorney-at-Law & Notary Public\nCommissioner for Oeths\nDuplicates Homagame\nSerial No: R0522\nJurisdiction Golombo\nPRIOR REGISTRATION: K54/138 and K 202/100 (Keg'
-Detected document type: deed
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.36.04_72e0c4fc.jpg ===
-OCR text length: 2105 characters
-OCR text sample (first 200 chars): "KEERTHI GOONATHILAKE\nNOW KNOW YE THAT WE\nSHYAMA MARSHANI VIJEROON\nSecretary\nDirector\nand\nto the Board of Directors of the People's Bank by virtue and in the exercise of the\npowers in us vested in this"
-Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
-
-=== BATCH OCR DEBUG for WhatsApp Image 2025-08-27 at 23.37.09_db7702ef.jpg ===
-OCR text length: 1333 characters
-OCR text sample (first 200 chars): 'P.B.Dissanayake F.S.L\nLicensed Surveyor Leveller\n& Court Commissioner,\n234/10, Wilgoda Road\nKurunegala.\nTel: 037-2233036\nඈනුමත කරම්.\n2016-07-\nදිගය.\n1.5.2./16... ප්\u200dරාදේශීය සභාව\nවරකාපොල\nK.M.N.PRIYANTH\n'
-Detected document type: survey_plan
-AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'utilities_data']
-Comprehensive data sections with data: 7
+AI analysis keys: ['document_type', 'extracted_data', 'general_data', 'comprehensive_data', 'translation_info', 'ai_available', 'utilities_data']
+Comprehensive data error: OpenAI API error: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}

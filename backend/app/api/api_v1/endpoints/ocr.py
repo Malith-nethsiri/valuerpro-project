@@ -616,24 +616,40 @@ async def batch_extract_text(
         
         files.append(file_record)
     
+    # Initialize Vision client for batch processing
+    vision_client = get_vision_client()
+    
     # Process each file with OCR
     results = []
     all_extracted_text = []
     
     for file_record in files:
         try:
-            # Process individual file
-            if file_record.mime_type.startswith('image/'):
-                text = extract_text_from_image(file_record.path)
-            elif file_record.mime_type == 'application/pdf':
-                text = extract_text_from_pdf(file_record.path)
+            # Validate file access
+            abs_file_path = validate_file_access(file_record.file_path, current_user)
+            file_ext = Path(abs_file_path).suffix.lower()
+            
+            # Process individual file based on type
+            if file_ext == '.pdf':
+                pages_text = pdf_to_images_and_extract_text(abs_file_path, vision_client)
+                text = "\n\n".join([page.text for page in pages_text if page.text.strip()])
+            elif file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.tif']:
+                pages_text = process_image_file(abs_file_path, vision_client)
+                text = pages_text[0].text if pages_text else ""
+            elif file_ext in ['.docx', '.doc']:
+                pages_text = extract_text_from_docx(abs_file_path)
+                text = pages_text[0].text if pages_text else ""
             else:
                 continue
                 
-            if text:
+            if text and text.strip():
                 # Get document type and AI analysis for individual file
-                doc_type = detect_document_type(text)
-                ai_data = process_document_with_ai(text, doc_type or "unknown")
+                try:
+                    doc_type = detect_document_type(text)
+                    ai_data = process_document_with_ai(text)
+                except Exception as ai_error:
+                    doc_type = "unknown"
+                    ai_data = {"error": f"AI analysis failed: {str(ai_error)}"}
                 
                 result = {
                     "file_id": str(file_record.id),
@@ -664,13 +680,16 @@ async def batch_extract_text(
             combined_text = "\n\n--- DOCUMENT SEPARATOR ---\n\n".join(all_extracted_text)
             
             # Detect overall document type from combined text
-            combined_doc_type = detect_document_type(combined_text)
+            try:
+                combined_doc_type = detect_document_type(combined_text)
+            except Exception:
+                combined_doc_type = "property_documents"
             
             # Process combined text with AI for better accuracy
-            consolidated_ai_data = process_document_with_ai(
-                combined_text, 
-                combined_doc_type or "property_documents"
-            )
+            try:
+                consolidated_ai_data = process_document_with_ai(combined_text)
+            except Exception as e:
+                consolidated_ai_data = {"error": f"AI processing failed: {str(e)}"}
             
             consolidated_data = {
                 "document_type": combined_doc_type,

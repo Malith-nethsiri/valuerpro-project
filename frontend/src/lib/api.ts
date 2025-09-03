@@ -1,72 +1,90 @@
-import axios from 'axios';
-import type { Report, ReportFormData, User, LoginResponse, UploadedFile, LocationData } from '@/types';
+import httpClient, { ApiErrorResponse } from './http-client';
+import type { 
+  Report, 
+  ReportFormData, 
+  User, 
+  LoginResponse, 
+  UploadedFile, 
+  LocationData 
+} from '@/types';
+import type {
+  ApiResponse,
+  LoginRequest,
+  RegisterRequest,
+  CreateReportRequest,
+  UpdateReportRequest,
+  UploadRequest,
+  MultiUploadRequest,
+} from '@/types/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-export const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
-  headers: {
-    'Content-Type': 'application/json',
+// Configure interceptors for the HTTP client
+httpClient.updateConfig({
+  interceptors: {
+    onError: async (error) => {
+      // Handle global errors
+      if (error.status_code === 401) {
+        // Clear tokens and redirect to login
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+          sessionStorage.removeItem('access_token');
+          
+          const currentPath = window.location.pathname;
+          if (!currentPath.startsWith('/auth/')) {
+            window.location.href = '/auth/login';
+          }
+        }
+      }
+      
+      // Re-throw to let calling code handle
+      throw error;
+    },
   },
 });
 
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage or cookie
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+// Export the configured client for direct use if needed
+export const apiClient = httpClient;
 
-// Response interceptor to handle auth errors
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Only redirect if not already on login/register pages
-      const currentPath = window.location.pathname;
-      const isAuthPage = currentPath.startsWith('/auth/');
-      
-      if (!isAuthPage) {
-        // Clear token and redirect to login
-        localStorage.removeItem('access_token');
-        window.location.href = '/auth/login';
-      }
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Auth API functions
+// Auth API functions with modern HTTP client
 export const authAPI = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
     const formData = new FormData();
     formData.append('username', email);
     formData.append('password', password);
     
-    const response = await apiClient.post('/auth/login', formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-    return response.data;
+    try {
+      const response = await httpClient.post<LoginResponse>('/auth/login', formData, {
+        headers: {
+          // Don't set Content-Type for FormData, let browser handle it
+        },
+      });
+      
+      // Store token in localStorage
+      if (typeof window !== 'undefined' && response.data.access_token) {
+        localStorage.setItem('access_token', response.data.access_token);
+        if (response.data.refresh_token) {
+          localStorage.setItem('refresh_token', response.data.refresh_token);
+        }
+      }
+      
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiErrorResponse) {
+        throw new Error(error.detail || error.error || 'Login failed');
+      }
+      throw error;
+    }
   },
   
-  register: async (userData: {
-    email: string;
-    password: string;
-    full_name: string;
-    role?: string;
-  }): Promise<User> => {
-    const response = await apiClient.post('/auth/register', userData);
-    return response.data;
+  register: async (userData: RegisterRequest): Promise<User> => {
+    try {
+      const response = await httpClient.post<User>('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiErrorResponse) {
+        throw new Error(error.detail || error.error || 'Registration failed');
+      }
+      throw error;
+    }
   },
   
   updateProfile: async (userData: {
@@ -105,13 +123,19 @@ export const authAPI = {
   },
   
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get('/auth/me');
-    return response.data;
+    try {
+      const response = await httpClient.get<User>('/auth/me');
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiErrorResponse) {
+        throw new Error(error.detail || error.error || 'Failed to get user info');
+      }
+      throw error;
+    }
   },
   
   getMe: async (): Promise<User> => {
-    const response = await apiClient.get('/auth/me');
-    return response.data;
+    return authAPI.getCurrentUser();
   },
 };
 

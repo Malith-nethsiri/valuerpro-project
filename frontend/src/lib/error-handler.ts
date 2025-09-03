@@ -1,5 +1,14 @@
 import type { APIError } from '@/types';
 
+// Define the ApiErrorResponse type here to avoid circular imports
+interface ApiErrorResponse {
+  error: string;
+  detail?: string;
+  status_code: number;
+  timestamp: string;
+  path?: string;
+}
+
 export class AppError extends Error {
   public statusCode?: number;
   public isOperational: boolean;
@@ -16,7 +25,35 @@ export class AppError extends Error {
 export const parseAPIError = (error: unknown): string => {
   if (!error) return 'An unknown error occurred';
   
-  // Axios error with response
+  // Modern ApiErrorResponse (from our HTTP client)
+  if (typeof error === 'object' && error !== null && 'status_code' in error && 'error' in error) {
+    const apiError = error as ApiErrorResponse;
+    
+    // Use detail if available, otherwise use error
+    if (apiError.detail) {
+      return apiError.detail;
+    }
+    
+    // Handle specific status codes
+    switch (apiError.status_code) {
+      case 401:
+        return 'Your session has expired. Please log in again.';
+      case 403:
+        return 'You do not have permission to perform this action.';
+      case 404:
+        return 'The requested resource was not found.';
+      case 422:
+        return apiError.error || 'Please check your input and try again.';
+      case 429:
+        return 'Too many requests. Please wait a moment before trying again.';
+      case 500:
+        return 'An internal server error occurred. Please try again later.';
+      default:
+        return apiError.error || 'An error occurred';
+    }
+  }
+  
+  // Legacy Axios error with response (for backwards compatibility)
   if (typeof error === 'object' && error !== null && 'response' in error) {
     const axiosError = error as { response?: { data?: APIError; status?: number } };
     if (axiosError.response?.data?.detail) {
@@ -36,12 +73,22 @@ export const parseAPIError = (error: unknown): string => {
     }
   }
   
-  // Network or other errors
+  // Error object with message
   if (typeof error === 'object' && error !== null && 'message' in error) {
     const messageError = error as { message: string };
-    if (messageError.message.includes('Network Error')) {
+    
+    // Handle network errors
+    if (messageError.message.includes('Network Error') || 
+        messageError.message.includes('fetch')) {
       return 'Unable to connect to the server. Please check your internet connection.';
     }
+    
+    // Handle timeout errors
+    if (messageError.message.includes('timeout') || 
+        messageError.message.includes('AbortError')) {
+      return 'Request timed out. Please try again.';
+    }
+    
     return messageError.message;
   }
   

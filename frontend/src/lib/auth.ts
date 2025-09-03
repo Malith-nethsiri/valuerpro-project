@@ -12,6 +12,13 @@ interface AuthContextType {
     password: string;
     full_name: string;
     role?: string;
+    registration_no?: string;
+    qualifications?: string;
+    experience_years?: number | string;
+    specialization?: string;
+    firm_name?: string;
+    designation?: string;
+    contact_phone?: string;
   }) => Promise<User>;
   updateProfile: (userData: {
     email?: string;
@@ -101,6 +108,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     password: string;
     full_name: string;
     role?: string;
+    registration_no?: string;
+    qualifications?: string;
+    experience_years?: number | string;
+    specialization?: string;
+    firm_name?: string;
+    designation?: string;
+    contact_phone?: string;
   }) => {
     const newUser = await authAPI.register(userData);
     return newUser;
