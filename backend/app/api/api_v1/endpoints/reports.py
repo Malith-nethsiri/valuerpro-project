@@ -154,10 +154,11 @@ def create_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    # Check if reference number is provided and already exists
+    # Check if reference number is provided and already exists for this user
     if report_in.ref:
         existing_report = db.query(Report).filter(
-            Report.ref == report_in.ref
+            Report.ref == report_in.ref,
+            Report.author_id == current_user.id
         ).first()
         if existing_report:
             raise HTTPException(
@@ -330,9 +331,61 @@ def delete_report(
     if report.author_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this report")
     
-    db.delete(report)
-    db.commit()
-    return {"message": "Report deleted successfully"}
+    try:
+        # Import models for cascade deletion
+        from app.models import (
+            Property, Identification, Location, Site, Building, 
+            Utilities, ValuationLine, ValuationSummary, Disclaimer,
+            Certificate, Appendix, AISuggestion, Revision
+        )
+        
+        # Delete related records in proper order (child to parent)
+        
+        # 1. Delete property-related records first
+        properties = db.query(Property).filter(Property.report_id == report_id).all()
+        for property_obj in properties:
+            # Delete property sub-records
+            db.query(Identification).filter(Identification.property_id == property_obj.id).delete()
+            db.query(Location).filter(Location.property_id == property_obj.id).delete()
+            db.query(Site).filter(Site.property_id == property_obj.id).delete()
+            db.query(Building).filter(Building.property_id == property_obj.id).delete()
+            db.query(Utilities).filter(Utilities.property_id == property_obj.id).delete()
+            db.query(ValuationLine).filter(ValuationLine.property_id == property_obj.id).delete()
+        
+        # 2. Delete properties
+        db.query(Property).filter(Property.report_id == report_id).delete()
+        
+        # 3. Delete report-level records
+        db.query(ValuationSummary).filter(ValuationSummary.report_id == report_id).delete()
+        db.query(Disclaimer).filter(Disclaimer.report_id == report_id).delete()
+        db.query(Certificate).filter(Certificate.report_id == report_id).delete()
+        db.query(Appendix).filter(Appendix.report_id == report_id).delete()
+        db.query(AISuggestion).filter(AISuggestion.report_id == report_id).delete()
+        db.query(Revision).filter(Revision.report_id == report_id).delete()
+        
+        # 4. Handle file cleanup - only delete files that are specifically associated with this report
+        # Note: Files might be shared or referenced by other reports, so we only delete
+        # files that have report_id set to this specific report
+        report_files = db.query(FileModel).filter(FileModel.report_id == report_id).all()
+        for file_obj in report_files:
+            # Delete associated OCR results
+            db.query(OCRResult).filter(OCRResult.file_id == file_obj.id).delete()
+            # Delete file record (physical file cleanup could be added here if needed)
+            db.delete(file_obj)
+        
+        # 5. Finally delete the report itself
+        db.delete(report)
+        db.commit()
+        
+        return {"message": "Report and all related data deleted successfully"}
+        
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Error deleting report {report_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete report: {str(e)}"
+        )
 
 
 # Report finalization

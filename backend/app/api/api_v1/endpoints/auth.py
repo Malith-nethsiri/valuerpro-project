@@ -96,9 +96,12 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             # Refresh user to include profile
             db.refresh(user)
         except Exception as e:
-            # If profile creation fails, log but don't fail registration
-            print(f"Profile creation failed: {e}")
+            # If profile creation fails, log error but don't fail registration
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Profile creation failed during registration for user {user.email}: {e}")
             db.rollback()
+            # Note: Could consider adding a warning field to response in the future
     
     return user
 

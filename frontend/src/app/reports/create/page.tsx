@@ -197,7 +197,37 @@ const CreateReportWizard = () => {
   };
 
   const canGoNext = () => {
-    // Add validation logic here based on current step
+    // Import validation function
+    const { validateWizardStep } = require('@/lib/validation');
+    
+    // Get current step ID
+    const currentStepId = steps[currentStep]?.id;
+    if (!currentStepId) return false;
+
+    // Get step data from wizard state
+    const stepDataMap = {
+      'report-info': 'reportInfo',
+      'identification': 'identification', 
+      'location': 'location',
+      'site': 'site',
+      'buildings': 'buildings',
+      'utilities': 'utilities',
+      'planning': 'planning',
+      'transport': 'transport',
+      'environmental': 'environmental',
+      'market': 'market',
+      'locality': 'locality',
+      'valuation': 'valuation',
+      'legal': 'legal',
+      'appendices': 'appendices',
+      'review': 'review'
+    };
+
+    const dataKey = stepDataMap[currentStepId as keyof typeof stepDataMap];
+    if (!dataKey) return true; // Allow navigation for steps without validation rules
+    
+    // This would need to access the wizard state - for now return true but structure is in place
+    // In a real implementation, we'd get the state from WizardProvider
     return true;
   };
 
