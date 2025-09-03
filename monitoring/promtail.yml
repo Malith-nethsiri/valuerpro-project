@@ -1,0 +1,233 @@
+# Promtail Configuration for ValuerPro Log Shipping
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ValuerPro Backend Application Logs
+  - job_name: valuerpro-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: valuerpro-backend
+          service: backend
+          environment: production
+          __path__: /app/logs/*.log
+    
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>\w+) (?P<logger>[\w\.]+):(?P<line>\d+) - (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05,000'
+          location: UTC
+      - labels:
+          level:
+          logger:
+      - output:
+          source: message
+
+  # Nginx Access Logs
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          service: nginx
+          log_type: access
+          environment: production
+          __path__: /var/log/nginx/access.log
+    
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>\S+) \S+ \S+ \[(?P<timestamp>[^\]]+)\] "(?P<method>\S+) (?P<path>[^\"]*) (?P<protocol>[^\"]*)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<referer>[^\"]*)" "(?P<user_agent>[^\"]*)"'
+      - timestamp:
+          source: timestamp
+          format: '02/Jan/2006:15:04:05 -0700'
+      - labels:
+          method:
+          status:
+          path:
+      - template:
+          source: path
+          template: '{{ regexReplaceAll "/api/v1/[^/]+/\\d+" .Value "/api/v1/{resource}/{id}" }}'
+
+  # Nginx Error Logs
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          service: nginx
+          log_type: error
+          environment: production
+          __path__: /var/log/nginx/error.log
+    
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<pid>\d+)#(?P<tid>\d+): (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: '2006/01/02 15:04:05'
+      - labels:
+          level:
+          pid:
+
+  # Docker Container Logs (for containerized deployment)
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(?P<container_name>.+)'
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+
+    pipeline_stages:
+      # Parse JSON logs from containers
+      - json:
+          expressions:
+            timestamp: time
+            level: level
+            message: msg
+            logger: name
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - labels:
+          level:
+          logger:
+          service:
+          project:
+
+  # Application-specific log patterns
+  - job_name: valuerpro-audit
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: valuerpro-audit
+          service: backend
+          log_type: audit
+          environment: production
+          __path__: /app/logs/audit.log
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            user_id: user_id
+            action: action
+            resource: resource
+            ip_address: ip_address
+            result: result
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          user_id:
+          action:
+          resource:
+          result:
+
+  # OCR Processing Logs
+  - job_name: valuerpro-ocr
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: valuerpro-ocr
+          service: backend
+          component: ocr
+          environment: production
+          __path__: /app/logs/ocr.log
+    
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) (?P<level>\w+) (?P<component>OCR) - File: (?P<file_id>\w+) - (?P<message>.*)'
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05,000'
+      - labels:
+          level:
+          file_id:
+          component:
+
+  # Database Query Logs (if enabled)
+  - job_name: valuerpro-db-queries
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: valuerpro-db-queries
+          service: backend
+          component: database
+          environment: production
+          __path__: /app/logs/queries.log
+    
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<duration>\d+\.?\d*ms) - (?P<query>.*)'
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05,000'
+      - labels:
+          duration:
+      - template:
+          source: query
+          template: '{{ regexReplaceAll "\\b\\d+\\b" .Value "?" }}'  # Replace numbers with ? for better grouping
+
+  # Security Events
+  - job_name: valuerpro-security
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: valuerpro-security
+          service: backend
+          component: security
+          environment: production
+          __path__: /app/logs/security.log
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            timestamp: timestamp
+            event_type: event_type
+            user_id: user_id
+            ip_address: ip_address
+            user_agent: user_agent
+            details: details
+            severity: severity
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      - labels:
+          event_type:
+          severity:
+          user_id:
+
+# Global configuration
+global:
+  scrape_timeout: 10s
+
+# Target configuration
+target_config:
+  sync_period: 10s

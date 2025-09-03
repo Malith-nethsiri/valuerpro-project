@@ -1,0 +1,253 @@
+# ValuerPro Alert Rules for Prometheus
+
+groups:
+  - name: valuerpro-application
+    rules:
+      # Application health checks
+      - alert: ValuerProBackendDown
+        expr: up{job="valuerpro-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "ValuerPro backend is down"
+          description: "ValuerPro backend has been down for more than 1 minute"
+
+      - alert: ValuerProFrontendDown
+        expr: up{job="nginx-exporter"} == 0 or probe_success{job="blackbox-http", instance="http://frontend:3000/api/health"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "ValuerPro frontend is unreachable"
+          description: "ValuerPro frontend has been unreachable for more than 2 minutes"
+
+      # High error rates
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 10% for more than 2 minutes"
+
+      # Response time alerts
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="valuerpro-backend"}[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High response time"
+          description: "95th percentile response time is above 2 seconds for more than 3 minutes"
+
+      # OCR processing alerts
+      - alert: OCRProcessingFailures
+        expr: rate(ocr_processing_failures_total[10m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: ocr
+        annotations:
+          summary: "OCR processing failures detected"
+          description: "OCR processing failure rate is above 5% for more than 5 minutes"
+
+      # File upload alerts
+      - alert: FileUploadFailures
+        expr: rate(file_upload_failures_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: uploads
+        annotations:
+          summary: "High file upload failure rate"
+          description: "File upload failure rate is above 10% for more than 5 minutes"
+
+  - name: infrastructure
+    rules:
+      # Database connectivity
+      - alert: DatabaseDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database has been down for more than 30 seconds"
+
+      # Database performance
+      - alert: DatabaseSlowQueries
+        expr: pg_stat_activity_max_tx_duration{datname="valuerpro"} > 30
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Database queries taking more than 30 seconds detected"
+
+      # Database connections
+      - alert: DatabaseHighConnections
+        expr: pg_stat_database_numbackends{datname="valuerpro"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection count"
+          description: "Database connection count is above 80 for more than 5 minutes"
+
+      # Redis connectivity
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      # Redis memory usage
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is above 90% for more than 5 minutes"
+
+  - name: system-resources
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is above 80% for more than 5 minutes on {{ $labels.instance }}"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90% for more than 5 minutes on {{ $labels.instance }}"
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is above 85% on {{ $labels.instance }} filesystem {{ $labels.mountpoint }}"
+
+      # Critical disk space
+      - alert: CriticalDiskSpace
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical disk space"
+          description: "Disk usage is above 95% on {{ $labels.instance }} filesystem {{ $labels.mountpoint }}"
+
+      # High disk I/O
+      - alert: HighDiskIO
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High disk I/O usage"
+          description: "Disk I/O usage is above 80% for more than 10 minutes on {{ $labels.instance }}"
+
+  - name: business-metrics
+    rules:
+      # Property analysis alerts
+      - alert: LowPropertyAnalysisRate
+        expr: rate(property_analyses_completed_total[1h]) < 5
+        for: 30m
+        labels:
+          severity: info
+          service: business
+        annotations:
+          summary: "Low property analysis rate"
+          description: "Property analysis completion rate is below 5 per hour for more than 30 minutes"
+
+      # Report generation failures
+      - alert: ReportGenerationFailures
+        expr: rate(report_generation_failures_total[30m]) > 0.02
+        for: 15m
+        labels:
+          severity: warning
+          service: reports
+        annotations:
+          summary: "Report generation failures"
+          description: "Report generation failure rate is above 2% for more than 15 minutes"
+
+      # User authentication issues
+      - alert: AuthenticationFailures
+        expr: rate(authentication_failures_total[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: auth
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is above 10% for more than 5 minutes"
+
+  - name: external-dependencies
+    rules:
+      # AI service availability
+      - alert: AIServiceDown
+        expr: rate(ai_service_requests_total{status="error"}[10m]) / rate(ai_service_requests_total[10m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: ai
+        annotations:
+          summary: "AI service high error rate"
+          description: "AI service error rate is above 50% for more than 5 minutes"
+
+      # Google Maps API issues
+      - alert: GoogleMapsAPIErrors
+        expr: rate(google_maps_api_errors_total[15m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: external
+        annotations:
+          summary: "Google Maps API errors"
+          description: "Google Maps API error rate is above 10% for more than 10 minutes"
+
+      # OCR service performance
+      - alert: OCRServiceSlow
+        expr: histogram_quantile(0.95, rate(ocr_processing_duration_seconds_bucket[10m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+          service: ocr
+        annotations:
+          summary: "OCR service slow response"
+          description: "95th percentile OCR processing time is above 30 seconds for more than 10 minutes"

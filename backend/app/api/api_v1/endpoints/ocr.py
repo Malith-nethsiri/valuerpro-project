@@ -531,7 +531,7 @@ async def extract_utilities_from_document(
         try:
             file_record = db.query(FileModel).filter(
                 FileModel.id == UUID(str(request.file_id)),
-                FileModel.user_id == current_user.id
+                FileModel.uploaded_by == current_user.id
             ).first()
         except Exception as e:
             raise HTTPException(status_code=400, detail="Invalid file_id format")

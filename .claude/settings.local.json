@@ -67,7 +67,10 @@
       "Bash(\"C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe\")",
       "Bash(netstat:*)",
       "Bash(rm:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(call venvScriptsactivate.bat)",
+      "Bash(venvScripts:*)",
+      "Bash(set DATABASE_URL=sqlite:///./test.db)"
     ],
     "deny": [],
     "ask": [],
