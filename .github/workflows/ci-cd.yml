@@ -83,7 +83,7 @@ jobs:
         pytest tests/ -k "ai_generated" -v || true
     
     - name: Upload performance benchmarks
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: backend-performance-benchmarks
@@ -99,7 +99,7 @@ jobs:
         name: backend-coverage
 
     - name: Upload backend security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: backend-security-reports
@@ -192,7 +192,7 @@ jobs:
       continue-on-error: true
     
     - name: Upload test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: frontend-test-results
@@ -362,7 +362,7 @@ jobs:
         python ai_test_analyzer.py
     
     - name: Upload AI analysis results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: ai-test-analysis
