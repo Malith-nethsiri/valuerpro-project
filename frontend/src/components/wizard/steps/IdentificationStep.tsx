@@ -60,16 +60,18 @@ export const IdentificationStep = () => {
 
     setAnalyzing(true);
     try {
-      // Process multiple files with batch OCR
+      // Process multiple files with batch OCR (new API)
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      const batchResponse = await fetch(`${API_BASE_URL}/ocr/batch_extract_text`, {
+      const batchResponse = await fetch(`${API_BASE_URL}/batch-ocr/batch-process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
         },
         body: JSON.stringify({
-          file_ids: fileIds
+          file_ids: fileIds,
+          consolidate_analysis: true,
+          auto_populate: true,
         }),
       });
 
@@ -86,10 +88,10 @@ export const IdentificationStep = () => {
       // Process results from all files - NEW API FORMAT
       let successfulFiles: any[] = [];
       let hasComprehensiveData = false;
-      
-      if (batchResult.results && batchResult.results.length > 0) {
-        successfulFiles = batchResult.results.filter((f: any) => !f.error);
-        console.log('Batch result files:', batchResult.results);
+
+      if (batchResult.files && batchResult.files.length > 0) {
+        successfulFiles = batchResult.files.filter((f: any) => !f.error);
+        console.log('Batch result files:', batchResult.files);
         console.log('Successful files:', successfulFiles);
         
         if (successfulFiles.length > 0) {
@@ -99,15 +101,15 @@ export const IdentificationStep = () => {
             const file = successfulFiles[i];
             console.log(`File ${i + 1}:`, {
               filename: file.filename,
-              has_ai_extracted_data: !!file.ai_extracted_data,
+              has_ai_analysis: !!file.ai_analysis,
               document_type: file.document_type,
-              extracted_text_length: file.extracted_text?.length || 0,
-              ai_data_keys: file.ai_extracted_data ? Object.keys(file.ai_extracted_data) : null
+              extracted_text_length: file.ocr_text?.length || 0,
+              ai_data_keys: file.ai_analysis ? Object.keys(file.ai_analysis) : null
             });
           }
-          
-          hasComprehensiveData = successfulFiles.some(f => 
-            f.ai_extracted_data && !f.ai_extracted_data.error
+
+          hasComprehensiveData = successfulFiles.some(f =>
+            f.ai_analysis && !f.ai_analysis.error
           );
           
           console.log('Has comprehensive data overall:', hasComprehensiveData);
@@ -115,12 +117,12 @@ export const IdentificationStep = () => {
           if (hasComprehensiveData) {
             // SIMPLE DIRECT APPROACH - Just populate the form fields directly
             console.log('🚀 DIRECT FORM POPULATION - Bypassing complex merger');
-            const firstFileWithComp = successfulFiles.find(f => 
-              f.ai_extracted_data && !f.ai_extracted_data.error
+            const firstFileWithComp = successfulFiles.find(f =>
+              f.ai_analysis && !f.ai_analysis.error
             );
-            
+
             if (firstFileWithComp) {
-              const data = firstFileWithComp.ai_extracted_data;
+              const data = firstFileWithComp.ai_analysis;
               console.log('📋 Raw data received:', JSON.stringify(data, null, 2));
               
               // DIRECT FIELD MAPPING - No complex processing
@@ -183,13 +185,16 @@ export const IdentificationStep = () => {
       }
       
       // Use consolidated analysis if available and no comprehensive data was already applied
-      if (batchResult.consolidated_data && !hasComprehensiveData) {
-        const consolidated = parseConsolidatedData(batchResult.consolidated_data);
-        console.log('Consolidated analysis:', batchResult.consolidated_data);
+      if (batchResult.consolidated_analysis && !hasComprehensiveData) {
+        const consolidated = parseConsolidatedData({
+          ...batchResult.consolidated_analysis,
+          auto_population_data: batchResult.auto_population_data,
+        });
+        console.log('Consolidated analysis:', batchResult.consolidated_analysis);
         console.log('Parsed consolidated data:', consolidated);
         setExtractedData(consolidated);
         setShowExtractedData(true);
-      } else if (batchResult.consolidated_data && hasComprehensiveData) {
+      } else if (batchResult.consolidated_analysis && hasComprehensiveData) {
         console.log('Skipping consolidated analysis - comprehensive data already applied');
       }
       
@@ -206,10 +211,10 @@ export const IdentificationStep = () => {
     const extracted: any = {};
     
     // Find the best data from successful files
-    const successfulFiles = batchResult.results.filter((f: any) => !f.error && f.ai_extracted_data);
-    
+    const successfulFiles = batchResult.files.filter((f: any) => !f.error && f.ai_analysis);
+
     for (const file of successfulFiles) {
-      const aiData = file.ai_extracted_data;
+      const aiData = file.ai_analysis;
       
       // Handle both comprehensive and specific extracted data
       let data = {};
