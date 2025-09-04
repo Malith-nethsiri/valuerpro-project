@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.api_v1.endpoints import auth, reports, uploads, ai, ocr, batch_ocr, maps, jobs, regulations, location
+from app.api.api_v1.endpoints import auth, reports, uploads, ai, ocr, batch_ocr, maps, jobs, regulations, location, files, monitoring
 from app.db import get_db, test_database_connection
 
 api_router = APIRouter()
@@ -15,6 +15,8 @@ api_router.include_router(maps.router, prefix="/maps", tags=["maps"])
 api_router.include_router(location.router, prefix="/location", tags=["location"])
 api_router.include_router(regulations.router, prefix="/regulations", tags=["regulations"])
 api_router.include_router(jobs.router, prefix="/jobs", tags=["background-jobs"])
+api_router.include_router(files.router, prefix="/files", tags=["files"])
+api_router.include_router(monitoring.router, prefix="/monitoring", tags=["monitoring"])
 
 
 @api_router.get("/healthz")

@@ -13,20 +13,29 @@ import os
 
 from app.main import app
 from app.db import get_db, Base
-from app.models import User, Report
+# Import all models to ensure they're registered with Base.metadata
+from app.models import (
+    User, Report, Client, Property, File, OCRResult, 
+    ValuerProfile, Identification, Location, Access,
+    Site, Building, Utilities, Planning, Locality,
+    ValuationLine, ValuationSummary, Disclaimer, Certificate,
+    Appendix, AISuggestion, Revision, Template,
+    RegulationDocument, RegulationLocationAssociation,
+    ComplianceChecklistTemplate, ComplianceAssessment
+)
 from app.deps import get_current_active_user
 from app.core.config import settings
 
-# Test database configuration
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+# Test database configuration - Use in-memory SQLite for tests
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={
         "check_same_thread": False,
-        "isolation_level": None
     },
     poolclass=StaticPool,
+    echo=False
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -66,7 +75,9 @@ def db_session(db_engine):
 def client(db_session) -> TestClient:
     """Create test client with database override."""
     app.dependency_overrides[get_db] = lambda: db_session
-    with TestClient(app) as test_client:
+    with TestClient(app, base_url="http://testserver") as test_client:
+        # Override host to be accepted by TrustedHostMiddleware
+        test_client.headers.update({"Host": "localhost"})
         yield test_client
     app.dependency_overrides.clear()
 
@@ -81,11 +92,6 @@ def test_user(db_session) -> User:
         email="test@example.com",
         full_name="Test User",
         hashed_password=pwd_context.hash("testpassword123"),
-        title="Chartered Valuer",
-        qualifications="AIVSL, FRICS",
-        panel_memberships="Valuation Panel, Supreme Court",
-        business_address="123 Test Street, Colombo 01",
-        contact_numbers="+94 11 123 4567",
         is_active=True
     )
     db_session.add(user)
@@ -117,16 +123,12 @@ def authenticated_client(client: TestClient, test_user: User) -> TestClient:
 def test_report(db_session, test_user: User) -> Report:
     """Create test report."""
     report = Report(
-        title="Test Property Valuation",
-        reference_number="TST-2024-001",
+        ref="TST-2024-001",
+        purpose="Market Valuation",
         status="draft",
-        property_address="123 Test Property, Test City",
-        data={
-            "property_type": "residential",
-            "land_area": 1000.0,
-            "building_area": 500.0,
-            "valuation_amount": 25000000.0
-        },
+        basis_of_value="Market Value",
+        report_type="standard",
+        currency="LKR",
         author_id=test_user.id
     )
     db_session.add(report)

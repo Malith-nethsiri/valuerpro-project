@@ -14,7 +14,12 @@ from datetime import datetime, timedelta
 from app.models import User, Report, Client, Property, File as FileModel, OCRResult
 from app.services.document_generation import document_service
 from app.services.validation_engine import create_validation_engine
-from app.services.ai_extraction import AIExtractionService
+# AI extraction service - import what's actually available
+try:
+    from app.services.ai_extraction import DocumentType
+    AI_EXTRACTION_AVAILABLE = True
+except ImportError:
+    AI_EXTRACTION_AVAILABLE = False
 from app.utils.database import database_transaction, transactional
 from app.middleware.error_handling import (
     BusinessLogicError, 

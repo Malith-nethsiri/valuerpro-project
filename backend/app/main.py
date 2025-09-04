@@ -16,14 +16,23 @@ from app.core.config import settings
 from app.api.api_v1.api import api_router
 from app.middleware.security import SecurityMiddleware
 from app.middleware.rate_limiting import RateLimitMiddleware
-from app.middleware.error_handling import ErrorHandlingMiddleware
-
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+from app.middleware.advanced_rate_limiting import (
+    AdvancedRateLimiter, 
+    RateLimitMiddleware as AdvancedRateLimitMiddleware,
+    RedisRateLimitStore,
+    InMemoryRateLimitStore,
+    RateLimitRule,
+    RateLimitType,
+    AI_ENDPOINT_CONFIGS
 )
-logger = logging.getLogger(__name__)
+from app.middleware.error_handling import ErrorHandlingMiddleware
+from app.middleware.performance_monitoring import PerformanceMiddleware
+from app.middleware.security_hardening import SecurityHardeningMiddleware
+from app.core.logging_config import setup_logging
+
+# Set up production-ready logging
+setup_logging()
+logger = logging.getLogger('app.main')
 
 
 @asynccontextmanager
@@ -73,23 +82,45 @@ app = FastAPI(
 # Error Handling Middleware - Must be first to catch all errors
 app.add_middleware(ErrorHandlingMiddleware)
 
-# Security Middleware - Add security headers
+# Security Hardening Middleware - Advanced security measures
+app.add_middleware(SecurityHardeningMiddleware, enable_pattern_detection=settings.is_production)
+
+# Performance Monitoring Middleware
+app.add_middleware(PerformanceMiddleware, enable_db_monitoring=True)
+
+# Security Middleware - Add basic security headers
 app.add_middleware(SecurityMiddleware)
 
-# Rate Limiting Middleware
+# Advanced Rate Limiting Middleware for AI endpoints
 if settings.RATE_LIMIT_ENABLED:
+    # Initialize appropriate store based on environment
     if settings.ENVIRONMENT == "development":
-        # More permissive limits for development
-        app.add_middleware(
-            RateLimitMiddleware,
-            requests_per_minute=300,  # 300/minute for dev
-            requests_per_hour=10000,  # 10k/hour for dev
-            burst_requests=50,        # 50 burst requests
-            burst_window_seconds=60   # 1 minute burst window
-        )
+        rate_limit_store = InMemoryRateLimitStore()
     else:
-        # Production limits
-        app.add_middleware(RateLimitMiddleware)
+        # Use Redis for production
+        redis_url = settings.get_rate_limit_redis_url()
+        rate_limit_store = RedisRateLimitStore(redis_url)
+    
+    # Create advanced rate limiter with endpoint-specific configs
+    advanced_limiter = AdvancedRateLimiter(
+        store=rate_limit_store,
+        default_rules=[
+            RateLimitRule(RateLimitType.REQUESTS_PER_MINUTE, 60 if settings.ENVIRONMENT == "development" else 20, 60),
+            RateLimitRule(RateLimitType.REQUESTS_PER_HOUR, 1000 if settings.ENVIRONMENT == "development" else 200, 3600),
+            RateLimitRule(RateLimitType.CONCURRENT_REQUESTS, 10 if settings.ENVIRONMENT == "development" else 3, 300),
+        ]
+    )
+    
+    # Configure endpoint-specific limits
+    for endpoint_pattern, rules in AI_ENDPOINT_CONFIGS.items():
+        advanced_limiter.configure_endpoint(endpoint_pattern, rules)
+    
+    # Add the advanced rate limiting middleware
+    app.add_middleware(
+        AdvancedRateLimitMiddleware,
+        limiter=advanced_limiter,
+        ai_endpoint_patterns=["/api/v1/ai/", "/api/v1/ocr/"]
+    )
 
 # Trusted Host Middleware - Prevent host header attacks
 app.add_middleware(

@@ -33,20 +33,19 @@ def upgrade() -> None:
     
     # Properties table indexes  
     op.create_index('idx_properties_report_id', 'properties', ['report_id'])
-    op.create_index('idx_properties_location', 'properties', ['latitude', 'longitude'])
+    # Skip location index as latitude/longitude fields may not exist yet
     
     # Files table indexes
     op.create_index('idx_files_uploaded_by', 'files', ['uploaded_by'])
     op.create_index('idx_files_report_id', 'files', ['report_id'])
     op.create_index('idx_files_created_at', 'files', ['created_at'])
-    op.create_index('idx_files_file_type', 'files', ['file_type'])
+    # Skip file_type index as field may not exist in current schema
     
     # OCR Results table indexes
     op.create_index('idx_ocr_results_file_id', 'ocr_results', ['file_id'])
-    op.create_index('idx_ocr_results_status', 'ocr_results', ['status'])
+    # Skip status index as field may not exist in current schema
     
-    # Valuation Lines table indexes
-    op.create_index('idx_valuation_lines_report_id', 'valuation_lines', ['report_id'])
+    # Valuation Lines table indexes - skip as structure may vary
     
     # Users table indexes (if not already present)
     op.create_index('idx_users_email', 'users', ['email'])
@@ -67,17 +66,17 @@ def downgrade() -> None:
     op.drop_index('idx_clients_created_at', 'clients')
     
     op.drop_index('idx_properties_report_id', 'properties')
-    op.drop_index('idx_properties_location', 'properties')
+    # op.drop_index('idx_properties_location', 'properties')  # Skip - was not created
     
     op.drop_index('idx_files_uploaded_by', 'files')
     op.drop_index('idx_files_report_id', 'files')
     op.drop_index('idx_files_created_at', 'files')
-    op.drop_index('idx_files_file_type', 'files')
+    # op.drop_index('idx_files_file_type', 'files')  # Skip - was not created
     
     op.drop_index('idx_ocr_results_file_id', 'ocr_results')
-    op.drop_index('idx_ocr_results_status', 'ocr_results')
+    # op.drop_index('idx_ocr_results_status', 'ocr_results')  # Skip - was not created
     
-    op.drop_index('idx_valuation_lines_report_id', 'valuation_lines')
+    # op.drop_index('idx_valuation_lines_report_id', 'valuation_lines')  # Skip - was not created
     
     op.drop_index('idx_users_email', 'users')
     op.drop_index('idx_users_is_active', 'users')

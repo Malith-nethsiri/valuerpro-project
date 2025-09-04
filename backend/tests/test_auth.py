@@ -14,13 +14,17 @@ def test_register_user(client: TestClient, db_session: Session):
         "email": "newuser@example.com",
         "password": "securepassword123",
         "full_name": "New Test User",
-        "title": "Junior Valuer",
+        "role": "valuer",
+        "registration_no": "REG123456",
         "qualifications": "BSc (Hons) Estate Management",
-        "business_address": "456 New Street, Colombo 02",
-        "contact_numbers": "+94 77 123 4567"
+        "firm_name": "Test Valuation Firm",
+        "contact_phone": "+94 77 123 4567"
     }
     
     response = client.post("/api/v1/auth/register", json=user_data)
+    if response.status_code != 200:
+        print(f"Response status: {response.status_code}")
+        print(f"Response content: {response.text}")
     assert response.status_code == 200
     
     data = response.json()

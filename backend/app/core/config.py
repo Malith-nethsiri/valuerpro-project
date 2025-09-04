@@ -160,6 +160,11 @@ class Settings(BaseSettings):
     def get_redis_url(self) -> str:
         """Get Redis URL for caching and sessions."""
         return self.CELERY_BROKER_URL
+    
+    def get_rate_limit_redis_url(self) -> str:
+        """Get Redis URL specifically for rate limiting."""
+        # Use separate database for rate limiting if needed
+        return self.CELERY_BROKER_URL.replace('/0', '/1')
 
 
 @lru_cache(maxsize=1)

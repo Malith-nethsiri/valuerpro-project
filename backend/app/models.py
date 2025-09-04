@@ -465,16 +465,30 @@ class File(Base):
     filename = Column(String, nullable=False)
     original_filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+    file_url = Column(String)  # Cloud storage URL
     mime_type = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)
     checksum = Column(String)
+    sha256_hash = Column(String)  # SHA256 hash for integrity checking
     kind = Column(String, default="other")
+    
+    # Cloud storage fields
+    storage_provider = Column(String, default="local")  # local, s3, etc.
+    storage_key = Column(String)  # Key/path in cloud storage
+    
+    # Validation and security fields
+    validation_status = Column(String, default="pending")  # passed, failed, pending
+    risk_level = Column(String, default="low")  # low, medium, high
+    description = Column(Text)
+    category = Column(String, default="document")
+    metadata_ = Column("metadata", JSON)  # Additional metadata as JSON
     
     # Foreign keys
     report_id = Column(UUID(as_uuid=True), ForeignKey("reports.id"), nullable=True)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
-    # Metadata
+    # Timestamps
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
