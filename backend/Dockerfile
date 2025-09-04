@@ -1,5 +1,5 @@
 # Multi-stage build for optimal production image
-FROM python:3.11-slim as builder
+FROM python:3.13-slim as builder
 
 # Set build arguments
 ARG BUILDPLATFORM
@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -e .
 
 # Production stage
-FROM python:3.11-slim as production
+FROM python:3.13-slim as production
 
 # Create non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
