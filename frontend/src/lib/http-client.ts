@@ -173,10 +173,13 @@ export class HttpClient {
       });
     }
 
+    // For DELETE operations, disable retries completely to prevent confusion
+    const maxRetries = method === 'DELETE' ? 0 : (options.retries || this.config.retries || 0);
+    
     let attempt = 0;
     let lastError: Error | null = null;
 
-    while (attempt <= (options.retries || this.config.retries || 0)) {
+    while (attempt <= maxRetries) {
       try {
         const response = await this.executeRequest<T>(method, url, options);
         
@@ -201,7 +204,7 @@ export class HttpClient {
 
         attempt++;
         
-        if (attempt <= (options.retries || this.config.retries || 0)) {
+        if (attempt <= maxRetries) {
           const delay = (options.retryDelay || this.config.retryDelay || 1000) * attempt;
           await this.sleep(delay);
         }
@@ -476,6 +479,8 @@ const defaultConfig: HttpClientConfig = {
   cache: true,
   defaultHeaders: {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'X-HTTP-Client-Version': '1.1.0', // Version bump to force cache invalidation
   },
 };
 

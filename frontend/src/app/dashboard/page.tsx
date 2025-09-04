@@ -130,9 +130,11 @@ export default function DashboardPage() {
   const handleDeleteReport = async (reportId: string) => {
     if (confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
       try {
+        setError(''); // Clear any previous errors
         await reportsAPI.delete(reportId);
         // Reload the reports list
         await loadData();
+        setError(''); // Ensure error is cleared after successful operation
       } catch (err: any) {
         setError('Failed to delete report');
       }
@@ -186,8 +188,15 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {error && (
-          <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
             {error}
+            <button
+              onClick={() => setError('')}
+              className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+              aria-label="Dismiss error"
+            >
+              ✕
+            </button>
           </div>
         )}
 

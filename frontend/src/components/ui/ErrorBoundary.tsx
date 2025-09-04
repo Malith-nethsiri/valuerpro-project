@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Enhanced Error Boundary Component
  * Provides comprehensive error handling and user-friendly error display

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Accessible Button Component
  * Provides full keyboard navigation and screen reader support
