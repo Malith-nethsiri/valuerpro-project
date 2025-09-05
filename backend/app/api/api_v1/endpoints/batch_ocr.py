@@ -4,6 +4,8 @@ Enhanced multi-document processing for competitive advantage
 """
 import asyncio
 import time
+import base64
+import requests
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -33,6 +35,146 @@ except ImportError as e:
 router = APIRouter()
 
 
+class VisionAPIKeyClient:
+    """Custom Vision API client using API key for authentication"""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://vision.googleapis.com/v1"
+    
+    def text_detection(self, image):
+        """Perform text detection using Google Vision API REST endpoint"""
+        url = f"{self.base_url}/images:annotate?key={self.api_key}"
+        
+        # Prepare the request payload
+        payload = {
+            "requests": [
+                {
+                    "image": {
+                        "content": base64.b64encode(image.content).decode('utf-8')
+                    },
+                    "features": [
+                        {
+                            "type": "TEXT_DETECTION",
+                            "maxResults": 10
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        
+        print(f"[BATCH OCR] Making request to Vision API: {url}")
+        print(f"[BATCH OCR] Payload size: {len(str(payload))}")
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        print(f"[BATCH OCR] Vision API response status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"[BATCH OCR] Vision API error response: {response.text}")
+        
+        response.raise_for_status()
+        
+        result = response.json()
+        print(f"[BATCH OCR] Vision API response: {result}")
+        
+        return result
+    
+    def document_text_detection(self, image):
+        """Perform document text detection using Google Vision API REST endpoint"""
+        url = f"{self.base_url}/images:annotate?key={self.api_key}"
+        
+        # Prepare the request payload
+        payload = {
+            "requests": [
+                {
+                    "image": {
+                        "content": base64.b64encode(image.content).decode('utf-8')
+                    },
+                    "features": [
+                        {
+                            "type": "DOCUMENT_TEXT_DETECTION",
+                            "maxResults": 10
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        headers = {
+            'Content-Type': 'application/json',
+        }
+        
+        print(f"[BATCH OCR] Making document text detection request to Vision API")
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        print(f"[BATCH OCR] Document text detection response status: {response.status_code}")
+        if response.status_code != 200:
+            print(f"[BATCH OCR] Document text detection error: {response.text}")
+        
+        response.raise_for_status()
+        
+        result = response.json()
+        print(f"[BATCH OCR] Document text detection response received")
+        
+        return result
+
+
+def get_vision_client():
+    """Initialize Google Vision client with proper credentials"""
+    if not VISION_AVAILABLE:
+        raise HTTPException(
+            status_code=400,
+            detail="Google Cloud Vision dependencies not installed"
+        )
+    
+    # Try different credential approaches
+    from app.core.config import settings
+    credentials_path = settings.GOOGLE_APPLICATION_CREDENTIALS
+    
+    # Approach 1: Service Account JSON file
+    if credentials_path:
+        # Handle both absolute and relative paths
+        if not os.path.isabs(credentials_path):
+            # Resolve relative to the backend root directory, not this file's location
+            backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+            credentials_path = os.path.join(backend_root, credentials_path.lstrip('./'))
+        
+        credentials_path = os.path.abspath(credentials_path)
+        if os.path.exists(credentials_path):
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+            try:
+                return vision.ImageAnnotatorClient()
+            except Exception as e:
+                pass  # Fall through to API key approach
+    
+    # Approach 2: Try API Key authentication
+    api_key = getattr(settings, 'GOOGLE_CLOUD_VISION_API_KEY', None)
+    if api_key:
+        try:
+            # Use HTTP REST API directly with API key
+            print(f"[BATCH OCR] Using API key authentication for Vision API")
+            return VisionAPIKeyClient(api_key)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Failed to initialize Google Vision client with API key: {str(e)}. Please check your GOOGLE_CLOUD_VISION_API_KEY in the .env file."
+            )
+    
+    # Approach 3: Try default credentials
+    try:
+        return vision.ImageAnnotatorClient()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Google Cloud credentials not configured. Please provide either:\n1. GOOGLE_APPLICATION_CREDENTIALS path to JSON file\n2. GOOGLE_CLOUD_VISION_API_KEY in .env\n3. Default application credentials\nError: {str(e)}"
+        )
+
+
 class OCRPageResult(BaseModel):
     page: int
     text: str
@@ -45,33 +187,68 @@ class OCRResponse(BaseModel):
     file_path: str
 
 
-def extract_text_from_image(image_data: bytes, client: vision.ImageAnnotatorClient, is_pdf_page: bool = False) -> str:
+def extract_text_from_image(image_data: bytes, client, is_pdf_page: bool = False) -> str:
     """Extract text from image using Google Vision API with enhanced detection"""
-    image = vision.Image(content=image_data)
-    
-    # Use document_text_detection for better layout preservation, especially for PDFs
-    if is_pdf_page:
-        response = client.document_text_detection(image=image)
+    try:
+        # Handle both regular Vision client and our custom API key client
+        if isinstance(client, VisionAPIKeyClient):
+            # Use our custom API key client - pass raw image data
+            image_obj = type('Image', (), {'content': image_data})()
+            
+            if is_pdf_page:
+                response_json = client.document_text_detection(image_obj)
+            else:
+                response_json = client.text_detection(image_obj)
+            
+            # Parse the REST API response
+            if 'responses' in response_json and response_json['responses']:
+                response = response_json['responses'][0]
+                if 'error' in response:
+                    raise Exception(f"Vision API error: {response['error']['message']}")
+                
+                if is_pdf_page:
+                    # For document text detection, try full_text_annotation first
+                    if 'fullTextAnnotation' in response and response['fullTextAnnotation']:
+                        return response['fullTextAnnotation']['text']
+                    # Fallback to textAnnotations
+                    elif 'textAnnotations' in response and response['textAnnotations']:
+                        return response['textAnnotations'][0]['description']
+                else:
+                    # For regular text detection
+                    if 'textAnnotations' in response and response['textAnnotations']:
+                        return response['textAnnotations'][0]['description']
+            return ""
+        else:
+            # Use regular Vision client
+            image = vision.Image(content=image_data)
+            
+            # Use document_text_detection for better layout preservation, especially for PDFs
+            if is_pdf_page:
+                response = client.document_text_detection(image=image)
+                
+                if response.error.message:
+                    raise Exception(f"Vision API error: {response.error.message}")
+                
+                # For document text detection, use full_text_annotation for better layout preservation
+                if response.full_text_annotation:
+                    return response.full_text_annotation.text
+                # Fallback to text_annotations if full_text_annotation is not available
+                elif response.text_annotations:
+                    return response.text_annotations[0].description
+                return ""
+            else:
+                # For regular images, use standard text detection
+                response = client.text_detection(image=image)
+                
+                if response.error.message:
+                    raise Exception(f"Vision API error: {response.error.message}")
+                
+                texts = response.text_annotations
+                return texts[0].description if texts else ""
         
-        if response.error.message:
-            raise Exception(f"Vision API error: {response.error.message}")
-        
-        # For document text detection, use full_text_annotation for better layout preservation
-        if response.full_text_annotation:
-            return response.full_text_annotation.text
-        # Fallback to text_annotations if full_text_annotation is not available
-        elif response.text_annotations:
-            return response.text_annotations[0].description
-        return ""
-    else:
-        # For regular images, use standard text detection
-        response = client.text_detection(image=image)
-        
-        if response.error.message:
-            raise Exception(f"Vision API error: {response.error.message}")
-        
-        texts = response.text_annotations
-        return texts[0].description if texts else ""
+    except Exception as e:
+        print(f"[BATCH OCR] Error in extract_text_from_image: {str(e)}")
+        raise
 
 
 def extract_text_with_ocr(file_path: str) -> OCRResponse:
@@ -79,13 +256,12 @@ def extract_text_with_ocr(file_path: str) -> OCRResponse:
     if not VISION_AVAILABLE:
         raise HTTPException(status_code=503, detail="OCR service not available")
     
-    # Ensure Google credentials are set
-    from app.core.config import settings
-    if settings.GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get('GOOGLE_APPLICATION_CREDENTIALS'):
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = settings.GOOGLE_APPLICATION_CREDENTIALS
+    print(f"[BATCH OCR] Starting OCR extraction for file: {file_path}")
     
     file_ext = Path(file_path).suffix.lower()
-    client = vision.ImageAnnotatorClient()
+    client = get_vision_client()  # Use our custom client function
+    
+    print(f"[BATCH OCR] Using client type: {type(client).__name__}")
     
     try:
         if file_ext == '.pdf':

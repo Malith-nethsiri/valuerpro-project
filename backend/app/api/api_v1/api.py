@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.api_v1.endpoints import auth, reports, uploads, ai, ocr, batch_ocr, maps, jobs, regulations, location, files, monitoring
+from app.api.api_v1.endpoints import auth, reports, uploads, ai, ocr, maps, jobs, regulations, location, files, monitoring
+from app.api.api_v1.endpoints import batch_ocr_new as batch_ocr
 from app.db import get_db, test_database_connection
 
 api_router = APIRouter()

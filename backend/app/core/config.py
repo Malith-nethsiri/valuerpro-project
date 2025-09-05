@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_PROJECT_ID: str = ""
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
     GOOGLE_CLOUD_CREDENTIALS_PATH: str = ""
+    GOOGLE_CLOUD_VISION_API_KEY: str = ""
     GOOGLE_MAPS_API_KEY: str = ""
     
     # OpenAI API with enhanced settings

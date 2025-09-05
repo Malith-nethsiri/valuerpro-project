@@ -85,7 +85,7 @@ app.add_middleware(ErrorHandlingMiddleware)
 # Security Hardening Middleware - Advanced security measures
 app.add_middleware(SecurityHardeningMiddleware, enable_pattern_detection=settings.is_production)
 
-# Performance Monitoring Middleware
+# Performance Monitoring Middleware - Fixed async issue in SQLAlchemy event handler (reload trigger)
 app.add_middleware(PerformanceMiddleware, enable_db_monitoring=True)
 
 # Security Middleware - Add basic security headers

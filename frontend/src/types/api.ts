@@ -75,6 +75,22 @@ export interface RegisterRequest {
   contact_phone?: string;
 }
 
+// Profile validation types
+export interface ProfileValidationResult {
+  is_complete: boolean;
+  missing_fields: string[];
+  completion_percentage: number;
+  message: string;
+}
+
+export interface ProfileCompletionStatus {
+  can_create_reports: boolean;
+  profile_complete: boolean;
+  required_fields: string[];
+  missing_fields: string[];
+  completion_percentage: number;
+}
+
 // Reports API Types
 export interface CreateReportRequest {
   ref?: string;

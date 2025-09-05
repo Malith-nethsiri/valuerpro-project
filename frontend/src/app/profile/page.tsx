@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import { validateRequired, validateEmail } from '@/lib/error-handler';
+import type { ProfileCompletionStatus } from '@/types/api';
 
 interface UserProfile {
   id: string;
@@ -36,6 +37,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileStatus, setProfileStatus] = useState<ProfileCompletionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -80,8 +82,14 @@ export default function ProfilePage() {
         return;
       }
 
-      const userData = await authAPI.getCurrentUser();
+      // Load both user profile and completion status
+      const [userData, statusData] = await Promise.all([
+        authAPI.getCurrentUser(),
+        authAPI.getProfileStatus()
+      ]);
+      
       setProfile(userData);
+      setProfileStatus(statusData);
       
       // Populate form with current data
       setFormData({
@@ -300,6 +308,52 @@ export default function ProfilePage() {
                 <p className="text-indigo-200 text-sm mt-1">
                   Member since {new Date(profile.created_at).toLocaleDateString()}
                 </p>
+                
+                {/* Profile Completion Status */}
+                {profileStatus && (
+                  <div className="mt-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs text-indigo-100 mb-1">
+                          <span>Profile Completion</span>
+                          <span>{Math.round(profileStatus.completion_percentage)}%</span>
+                        </div>
+                        <div className="w-full bg-indigo-400 bg-opacity-30 rounded-full h-2">
+                          <div
+                            className="bg-white h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${profileStatus.completion_percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                      {!profileStatus.can_create_reports && (
+                        <button
+                          onClick={() => router.push('/profile/complete')}
+                          className="bg-yellow-500 hover:bg-yellow-600 text-yellow-900 px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                        >
+                          Complete Profile
+                        </button>
+                      )}
+                    </div>
+                    {!profileStatus.can_create_reports && profileStatus.missing_fields.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-indigo-100 text-xs mb-1">Missing required fields:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {profileStatus.missing_fields.slice(0, 3).map((field, index) => (
+                            <span
+                              key={index}
+                              className="bg-indigo-400 bg-opacity-30 text-indigo-100 px-2 py-0.5 rounded text-xs"
+                            >
+                              {field}
+                            </span>
+                          ))}
+                          {profileStatus.missing_fields.length > 3 && (
+                            <span className="text-indigo-200 text-xs">+{profileStatus.missing_fields.length - 3} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex space-x-3">
                 {!isEditing ? (
@@ -341,6 +395,45 @@ export default function ProfilePage() {
             {success && (
               <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
                 <div className="text-green-700">{success}</div>
+              </div>
+            )}
+
+            {/* Profile Status Alert */}
+            {profileStatus && !profileStatus.can_create_reports && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-md">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg
+                      className="h-5 w-5 text-orange-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 15.5c-.77.833.192 2.5 1.732 2.5z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-orange-800">
+                      Profile Incomplete
+                    </h3>
+                    <p className="mt-1 text-sm text-orange-700">
+                      To create professional valuation reports, please complete the required profile information.
+                    </p>
+                    <div className="mt-3">
+                      <button
+                        onClick={() => router.push('/profile/complete')}
+                        className="bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1 rounded-md text-sm font-medium transition-colors"
+                      >
+                        Complete Profile Now
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

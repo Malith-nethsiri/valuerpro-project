@@ -15,6 +15,8 @@ import type {
   UpdateReportRequest,
   UploadRequest,
   MultiUploadRequest,
+  ProfileValidationResult,
+  ProfileCompletionStatus,
 } from '@/types/api';
 
 // Configure interceptors for the HTTP client
@@ -136,6 +138,30 @@ export const authAPI = {
   
   getMe: async (): Promise<User> => {
     return authAPI.getCurrentUser();
+  },
+  
+  getProfileStatus: async (): Promise<ProfileCompletionStatus> => {
+    try {
+      const response = await httpClient.get<ProfileCompletionStatus>('/auth/me/profile-status');
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiErrorResponse) {
+        throw new Error(error.detail || error.error || 'Failed to get profile status');
+      }
+      throw error;
+    }
+  },
+  
+  validateProfile: async (): Promise<ProfileValidationResult> => {
+    try {
+      const response = await httpClient.get<ProfileValidationResult>('/auth/me/profile-validation');
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiErrorResponse) {
+        throw new Error(error.detail || error.error || 'Failed to validate profile');
+      }
+      throw error;
+    }
   },
 };
 

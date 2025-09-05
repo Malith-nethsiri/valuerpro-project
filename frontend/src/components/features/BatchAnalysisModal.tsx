@@ -216,196 +216,199 @@ export default function BatchAnalysisModal({
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Main Content Area */}
         {result && !isProcessing && (
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('files')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'files'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                File Processing Results
-              </button>
-              {result.consolidated_analysis && (
-              <>
+          <>
+            {/* Tabs */}
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8">
                 <button
-                  onClick={() => setActiveTab('analysis')}
+                  onClick={() => setActiveTab('files')}
                   className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'analysis'
+                    activeTab === 'files'
                       ? 'border-indigo-500 text-indigo-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  Consolidated Analysis
+                  File Processing Results
                 </button>
-                <button
-                  onClick={() => setActiveTab('recommendations')}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'recommendations'
-                      ? 'border-indigo-500 text-indigo-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Recommendations ({result.consolidated_analysis.recommendations.length})
-                </button>
-              </>
-            )}
-            </nav>
-          </div>
+                {result.consolidated_analysis && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('analysis')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'analysis'
+                          ? 'border-indigo-500 text-indigo-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      Consolidated Analysis
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('recommendations')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        activeTab === 'recommendations'
+                          ? 'border-indigo-500 text-indigo-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      Recommendations ({result.consolidated_analysis.recommendations.length})
+                    </button>
+                  </>
+                )}
+              </nav>
+            </div>
 
-          {/* Tab Content */}
-          <div className="mt-6 max-h-96 overflow-y-auto">
-          {activeTab === 'files' && (
-            <div className="space-y-4">
-              {result.files.map((file) => (
-                <div
-                  key={file.file_id}
-                  className={`border rounded-lg p-4 ${
-                    file.success 
-                      ? 'border-green-200 bg-green-50' 
-                      : 'border-red-200 bg-red-50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      {file.success ? (
-                        <CheckCircleIcon className="h-6 w-6 text-green-600" />
-                      ) : (
-                        <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
-                      )}
-                      <div>
-                        <h4 className="font-medium text-gray-900">{file.filename}</h4>
-                        {file.document_type && (
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 border ${getDocumentTypeColor(file.document_type)}`}>
-                            {file.document_type.replace('_', ' ').toUpperCase()}
-                          </span>
-                        )}
-                        {file.error && (
-                          <p className="text-sm text-red-700 mt-1">{file.error}</p>
-                        )}
+            {/* Tab Content */}
+            <div className="mt-6 max-h-96 overflow-y-auto">
+              {activeTab === 'files' && (
+                <div className="space-y-4">
+                  {result.files.map((file) => (
+                    <div
+                      key={file.file_id}
+                      className={`border rounded-lg p-4 ${
+                        file.success 
+                          ? 'border-green-200 bg-green-50' 
+                          : 'border-red-200 bg-red-50'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-3">
+                          {file.success ? (
+                            <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                          ) : (
+                            <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                          )}
+                          <div>
+                            <h4 className="font-medium text-gray-900">{file.filename}</h4>
+                            {file.document_type && (
+                              <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium mt-1 border ${getDocumentTypeColor(file.document_type)}`}>
+                                {file.document_type.replace('_', ' ').toUpperCase()}
+                              </span>
+                            )}
+                            {file.error && (
+                              <p className="text-sm text-red-700 mt-1">{file.error}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-gray-500">
+                            {file.processing_time && `${formatProcessingTime(file.processing_time)}`}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">
-                        {file.processing_time && `${formatProcessingTime(file.processing_time)}`}
-                      </div>
+                  ))}
+                </div>
+              )}
+
+              {activeTab === 'analysis' && result.consolidated_analysis && (
+                <div className="space-y-6">
+                  {/* Property Details */}
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold text-blue-900 mb-3">
+                      Consolidated Property Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {Object.entries(result.consolidated_analysis.property_details).map(([key, value]) => (
+                        <div key={key} className="border-l-2 border-blue-300 pl-3">
+                          <div className="text-sm font-medium text-gray-700 capitalize">
+                            {key.replace(/_/g, ' ')}:
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            {Array.isArray(value) 
+                              ? value.join(', ') || 'N/A'
+                              : value || 'N/A'
+                            }
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cross-Document Validation */}
+                  <div className="bg-yellow-50 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold text-yellow-900 mb-3">
+                      Cross-Document Validation
+                    </h4>
+                    <div className="space-y-2">
+                      {Object.entries(result.consolidated_analysis.cross_document_validation).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {key.replace(/_/g, ' ')}:
+                          </span>
+                          <span className={`text-sm font-semibold ${
+                            value === true ? 'text-green-600' : 
+                            value === false ? 'text-red-600' : 'text-gray-500'
+                          }`}>
+                            {value === true ? '✓ Consistent' : 
+                             value === false ? '✗ Inconsistent' : 'N/A'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Confidence Scores */}
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold text-purple-900 mb-3">
+                      Analysis Confidence Scores
+                    </h4>
+                    <div className="space-y-3">
+                      {Object.entries(result.consolidated_analysis.confidence_scores).map(([docType, score]) => (
+                        <div key={docType} className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {docType.replace('_', ' ')}:
+                          </span>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-20 bg-gray-200 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  score >= 80 ? 'bg-green-500' :
+                                  score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${score}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {Math.round(score)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {activeTab === 'analysis' && result.consolidated_analysis && (
-            <div className="space-y-6">
-              {/* Property Details */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h4 className="text-lg font-semibold text-blue-900 mb-3">
-                  Consolidated Property Information
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Object.entries(result.consolidated_analysis.property_details).map(([key, value]) => (
-                    <div key={key} className="border-l-2 border-blue-300 pl-3">
-                      <div className="text-sm font-medium text-gray-700 capitalize">
-                        {key.replace(/_/g, ' ')}:
-                      </div>
-                      <div className="text-sm text-gray-900">
-                        {Array.isArray(value) 
-                          ? value.join(', ') || 'N/A'
-                          : value || 'N/A'
-                        }
-                      </div>
+              {activeTab === 'recommendations' && result.consolidated_analysis && (
+                <div className="space-y-4">
+                  {result.consolidated_analysis.recommendations.map((recommendation, index) => (
+                    <div
+                      key={index}
+                      className={`border-l-4 pl-4 py-3 ${
+                        recommendation.startsWith('⚠️') 
+                          ? 'border-yellow-400 bg-yellow-50' 
+                          : recommendation.startsWith('✅')
+                          ? 'border-green-400 bg-green-50'
+                          : 'border-blue-400 bg-blue-50'
+                      }`}
+                    >
+                      <p className="text-sm text-gray-800">{recommendation}</p>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              {/* Cross-Document Validation */}
-              <div className="bg-yellow-50 rounded-lg p-4">
-                <h4 className="text-lg font-semibold text-yellow-900 mb-3">
-                  Cross-Document Validation
-                </h4>
-                <div className="space-y-2">
-                  {Object.entries(result.consolidated_analysis.cross_document_validation).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700 capitalize">
-                        {key.replace(/_/g, ' ')}:
-                      </span>
-                      <span className={`text-sm font-semibold ${
-                        value === true ? 'text-green-600' : 
-                        value === false ? 'text-red-600' : 'text-gray-500'
-                      }`}>
-                        {value === true ? '✓ Consistent' : 
-                         value === false ? '✗ Inconsistent' : 'N/A'}
-                      </span>
+                  
+                  {result.consolidated_analysis.recommendations.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <DocumentTextIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No specific recommendations at this time.</p>
+                      <p className="text-sm">Your document set appears comprehensive.</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Confidence Scores */}
-              <div className="bg-purple-50 rounded-lg p-4">
-                <h4 className="text-lg font-semibold text-purple-900 mb-3">
-                  Analysis Confidence Scores
-                </h4>
-                <div className="space-y-3">
-                  {Object.entries(result.consolidated_analysis.confidence_scores).map(([docType, score]) => (
-                    <div key={docType} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700 capitalize">
-                        {docType.replace('_', ' ')}:
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              score >= 80 ? 'bg-green-500' :
-                              score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${score}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-semibold text-gray-900">
-                          {Math.round(score)}%
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'recommendations' && result.consolidated_analysis && (
-            <div className="space-y-4">
-              {result.consolidated_analysis.recommendations.map((recommendation, index) => (
-                <div
-                  key={index}
-                  className={`border-l-4 pl-4 py-3 ${
-                    recommendation.startsWith('⚠️') 
-                      ? 'border-yellow-400 bg-yellow-50' 
-                      : recommendation.startsWith('✅')
-                      ? 'border-green-400 bg-green-50'
-                      : 'border-blue-400 bg-blue-50'
-                  }`}
-                >
-                  <p className="text-sm text-gray-800">{recommendation}</p>
-                </div>
-              ))}
-              
-              {result.consolidated_analysis.recommendations.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <DocumentTextIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No specific recommendations at this time.</p>
-                  <p className="text-sm">Your document set appears comprehensive.</p>
+                  )}
                 </div>
               )}
             </div>
-          )}
-          </div>
+          </>
         )}
 
         {/* Footer */}

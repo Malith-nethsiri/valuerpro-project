@@ -11,7 +11,8 @@ from app.db import get_db
 from app.models import User, ValuerProfile
 from app.schemas import (
     UserCreate, User as UserSchema, Token, UserUpdate,
-    ValuerProfileCreate, ValuerProfileUpdate
+    ValuerProfileCreate, ValuerProfileUpdate,
+    ProfileValidationResult, ProfileCompletionStatus
 )
 from app.deps import get_current_active_user
 
@@ -201,3 +202,81 @@ def update_valuer_profile(
     # Refresh user to include updated profile
     db.refresh(current_user)
     return current_user
+
+
+def validate_profile_completeness(profile: ValuerProfile) -> ProfileValidationResult:
+    """Validate if valuer profile is complete for professional reports"""
+    required_fields = {
+        'qualifications': 'Professional qualifications',
+        'registration_no': 'Registration number',
+        'company_name': 'Company name',
+        'contact_phones': 'Contact phone numbers'
+    }
+    
+    missing_fields = []
+    
+    if not profile:
+        missing_fields = list(required_fields.values())
+        return ProfileValidationResult(
+            is_complete=False,
+            missing_fields=missing_fields,
+            completion_percentage=0.0,
+            message="Valuer profile not found. Please create your professional profile."
+        )
+    
+    # Check required fields
+    if not profile.qualifications or len(profile.qualifications) == 0:
+        missing_fields.append(required_fields['qualifications'])
+    
+    if not profile.registration_no or profile.registration_no.strip() == "":
+        missing_fields.append(required_fields['registration_no'])
+    
+    if not profile.company_name or profile.company_name.strip() == "":
+        missing_fields.append(required_fields['company_name'])
+    
+    if not profile.contact_phones or len(profile.contact_phones) == 0:
+        missing_fields.append(required_fields['contact_phones'])
+    
+    # Calculate completion percentage
+    total_fields = len(required_fields)
+    completed_fields = total_fields - len(missing_fields)
+    completion_percentage = (completed_fields / total_fields) * 100
+    
+    is_complete = len(missing_fields) == 0
+    message = "Profile complete for report creation" if is_complete else f"Please complete {len(missing_fields)} required field(s)"
+    
+    return ProfileValidationResult(
+        is_complete=is_complete,
+        missing_fields=missing_fields,
+        completion_percentage=completion_percentage,
+        message=message
+    )
+
+
+@router.get("/me/profile-status", response_model=ProfileCompletionStatus)
+def get_profile_completion_status(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current user's profile completion status for report creation"""
+    profile = current_user.valuer_profile
+    validation_result = validate_profile_completeness(profile)
+    
+    required_fields = ['qualifications', 'registration_no', 'company_name', 'contact_phones']
+    
+    return ProfileCompletionStatus(
+        can_create_reports=validation_result.is_complete,
+        profile_complete=validation_result.is_complete,
+        required_fields=required_fields,
+        missing_fields=validation_result.missing_fields,
+        completion_percentage=validation_result.completion_percentage
+    )
+
+
+@router.get("/me/profile-validation", response_model=ProfileValidationResult)
+def validate_profile_for_reports(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Validate if user's profile is complete enough for creating professional reports"""
+    profile = current_user.valuer_profile
+    return validate_profile_completeness(profile)

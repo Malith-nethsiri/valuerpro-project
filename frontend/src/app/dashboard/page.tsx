@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { reportsAPI } from '@/lib/api';
+import { reportsAPI, authAPI } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { ProfileCompletionModal } from '@/components/features';
+import type { ProfileCompletionStatus } from '@/types/api';
 import { 
   EyeIcon, 
   PencilIcon, 
@@ -26,6 +28,8 @@ interface Report {
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const [reports, setReports] = useState<Report[]>([]);
+  const [profileStatus, setProfileStatus] = useState<ProfileCompletionStatus | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
@@ -58,8 +62,12 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const reportsResponse = await reportsAPI.list();
+      const [reportsResponse, profileStatusResponse] = await Promise.all([
+        reportsAPI.list(),
+        authAPI.getProfileStatus()
+      ]);
       setReports(reportsResponse);
+      setProfileStatus(profileStatusResponse);
     } catch (err: any) {
       setError('Failed to load reports');
     } finally {
@@ -71,8 +79,20 @@ export default function DashboardPage() {
     logout();
   };
 
-  const handleCreateReport = () => {
-    router.push('/reports/create');
+  const handleCreateReport = async () => {
+    try {
+      // Check profile status before creating report
+      const status = await authAPI.getProfileStatus();
+      if (!status.can_create_reports) {
+        setProfileStatus(status);
+        setShowProfileModal(true);
+        return;
+      }
+      
+      router.push('/reports/create');
+    } catch (err: any) {
+      setError('Failed to check profile status');
+    }
   };
 
   const handleViewReport = (reportId: string, format: 'pdf' | 'docx' = 'pdf') => {
@@ -203,9 +223,46 @@ export default function DashboardPage() {
         {/* User Profile Summary */}
         <div className="bg-white overflow-hidden shadow rounded-lg mb-6">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-              Profile Information
-            </h3>
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                Profile Information
+              </h3>
+              
+              {/* Profile Completion Status */}
+              {profileStatus && (
+                <div className="min-w-0 flex-1 ml-6">
+                  <div className="flex items-center justify-end space-x-3">
+                    <div className="flex-1">
+                      <div className="flex justify-between text-xs text-gray-600 mb-1">
+                        <span>Profile Completion</span>
+                        <span>{Math.round(profileStatus.completion_percentage)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            profileStatus.can_create_reports ? 'bg-green-500' : 'bg-orange-500'
+                          }`}
+                          style={{ width: `${profileStatus.completion_percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                    {!profileStatus.can_create_reports && (
+                      <button
+                        onClick={() => router.push('/profile/complete')}
+                        className="bg-orange-100 hover:bg-orange-200 text-orange-800 px-3 py-1 rounded-md text-xs font-medium transition-colors"
+                      >
+                        Complete Profile
+                      </button>
+                    )}
+                  </div>
+                  {!profileStatus.can_create_reports && (
+                    <p className="text-orange-600 text-xs mt-2 text-right">
+                      Complete your profile to create reports
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Name</p>
@@ -394,6 +451,15 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Profile Completion Modal */}
+      {profileStatus && (
+        <ProfileCompletionModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          profileStatus={profileStatus}
+        />
+      )}
     </div>
   );
 }

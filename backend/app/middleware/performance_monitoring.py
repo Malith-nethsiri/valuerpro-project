@@ -210,9 +210,8 @@ class PerformanceMiddleware(BaseHTTPMiddleware):
             
             # Log slow queries
             if total_time > 0.1:  # 100ms threshold
-                asyncio.create_task(performance_metrics.record_slow_query(
-                    statement, total_time, parameters
-                ))
+                # Note: Can't use async task here since this is a synchronous event handler
+                # Just log the slow query instead
                 logger.warning(f"Slow query detected: {total_time:.3f}s - {statement[:200]}")
     
     async def dispatch(self, request: Request, call_next):

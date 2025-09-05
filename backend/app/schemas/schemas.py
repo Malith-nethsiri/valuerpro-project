@@ -112,6 +112,22 @@ class TokenData(BaseModel):
     email: Optional[str] = None
 
 
+# Profile validation schemas
+class ProfileValidationResult(BaseModel):
+    is_complete: bool
+    missing_fields: List[str]
+    completion_percentage: float
+    message: str
+
+
+class ProfileCompletionStatus(BaseModel):
+    can_create_reports: bool
+    profile_complete: bool
+    required_fields: List[str]
+    missing_fields: List[str]
+    completion_percentage: float
+
+
 # Client schemas
 class ClientBase(BaseModel):
     name: str

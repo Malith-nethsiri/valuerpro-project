@@ -22,6 +22,7 @@ from app.deps import get_current_active_user
 from app.services.document_generation import document_service
 from app.services.validation_engine import create_validation_engine
 from app.services.appendix_generator import create_appendix_generator
+from app.api.api_v1.endpoints.auth import validate_profile_completeness
 
 router = APIRouter()
 
@@ -154,6 +155,19 @@ def create_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    # Validate that user's profile is complete enough for creating professional reports
+    profile_validation = validate_profile_completeness(current_user.valuer_profile)
+    if not profile_validation.is_complete:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "incomplete_profile",
+                "message": "Please complete your professional profile before creating reports",
+                "missing_fields": profile_validation.missing_fields,
+                "completion_percentage": profile_validation.completion_percentage
+            }
+        )
+    
     # Check if reference number is provided and already exists for this user
     if report_in.ref:
         existing_report = db.query(Report).filter(
