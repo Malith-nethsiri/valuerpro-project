@@ -91,9 +91,9 @@ class JobQueue:
     
     def _register_default_handlers(self):
         """Register default job handlers"""
-        from app.services.ai_extraction import process_document_with_ai
+        # from app.services.ai_extraction import process_document_with_ai  # Temporarily disabled
         from app.services.document_generation import document_service
-        from app.api.api_v1.endpoints.ai import extract_text, perform_cross_validation
+        # from app.api.api_v1.endpoints.ai import extract_text, perform_cross_validation  # Temporarily disabled
         
         # Register handlers for different job types
         self.job_handlers[JobType.OCR_PROCESSING] = self._handle_ocr_job
@@ -208,8 +208,8 @@ class JobQueue:
                 job.progress_message = message
     
     def _handle_ocr_job(self, job: BackgroundJob) -> Dict[str, Any]:
-        """Handle OCR processing job"""
-        from app.api.api_v1.endpoints.ai import extract_text, OCRRequest
+        """Handle OCR processing job - TEMPORARILY DISABLED"""
+        # from app.api.api_v1.endpoints.ai import extract_text, OCRRequest  # Temporarily disabled
         from app.db import SessionLocal
         from app.models import User
         
@@ -232,8 +232,9 @@ class JobQueue:
             self._update_progress(job.id, 30, "Extracting text from document...")
             
             # Run OCR extraction
-            ocr_request = OCRRequest(file_id=file_id)
-            ocr_result = extract_text(ocr_request, user, db)
+            # ocr_request = OCRRequest(file_id=file_id)  # Temporarily disabled
+            # ocr_result = extract_text(ocr_request, user, db)  # Temporarily disabled
+            ocr_result = {"error": "OCR background job temporarily disabled"}
             
             self._update_progress(job.id, 90, "Finalizing results...")
             
@@ -252,7 +253,7 @@ class JobQueue:
     
     def _handle_analysis_job(self, job: BackgroundJob) -> Dict[str, Any]:
         """Handle document analysis job"""
-        from app.services.ai_extraction import process_document_with_ai
+        # from app.services.ai_extraction import process_document_with_ai  # Temporarily disabled
         
         payload = job.payload
         text = payload.get("text")
@@ -264,7 +265,8 @@ class JobQueue:
         self._update_progress(job.id, 20, "Analyzing document...")
         
         # Run AI analysis
-        analysis_result = process_document_with_ai(text, document_type)
+        # analysis_result = process_document_with_ai(text, document_type)  # Temporarily disabled
+        analysis_result = {"error": "AI analysis temporarily disabled"}
         
         self._update_progress(job.id, 90, "Finalizing analysis...")
         

@@ -39,7 +39,7 @@ logger = logging.getLogger('app.main')
 async def lifespan(app: FastAPI):
     """Application lifespan management with proper startup/shutdown."""
     # Startup
-    logger.info("🚀 Starting ValuerPro API server...")
+    logger.info("Starting ValuerPro API server...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug mode: {settings.DEBUG}")
     logger.info(f"API Version: {settings.APP_VERSION}")

@@ -35,7 +35,8 @@ export const useFieldValidation = (
 ): UseFieldValidationReturn => {
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
-  const { validateStep, state } = useWizard();
+  // Note: Temporarily removed wizard context dependency for Group-based architecture
+  // const { validateStep, state } = useWizard();
   
   const {
     required = false,
@@ -139,17 +140,19 @@ export const useFieldValidation = (
 
 // Hook for step-level validation
 export const useStepValidation = (stepIndex: number) => {
-  const { validateStep } = useWizard();
+  // Note: Temporarily disabled for Group-based architecture
+  // const { validateStep } = useWizard();
   const [errors, setErrors] = useState<string[]>([]);
   const [isValidating, setIsValidating] = useState(false);
 
   const validate = useCallback(async () => {
     setIsValidating(true);
-    const stepErrors = validateStep(stepIndex);
+    // Temporarily disabled wizard step validation for Group-based architecture
+    const stepErrors: string[] = [];
     setErrors(stepErrors);
     setIsValidating(false);
     return stepErrors;
-  }, [validateStep, stepIndex]);
+  }, [stepIndex]);
 
   const clearErrors = useCallback(() => {
     setErrors([]);

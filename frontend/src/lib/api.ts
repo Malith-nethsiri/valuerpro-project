@@ -309,6 +309,17 @@ export const reportsAPI = {
     const response = await apiClient.get(`/reports/check-reference/${encodeURIComponent(ref)}`, { params });
     return response.data;
   },
+
+  // Client-related methods (delegates to clientsAPI)
+  getClients: async (): Promise<{ success: boolean; data: any[] }> => {
+    try {
+      const clients = await clientsAPI.list();
+      return { success: true, data: clients };
+    } catch (error) {
+      console.error('Failed to fetch clients:', error);
+      return { success: false, data: [] };
+    }
+  },
 };
 
 // OCR API functions
@@ -345,6 +356,18 @@ export const ocrAPI = {
   extractUtilities: async (fileId: string) => {
     const response = await apiClient.post('/ocr/extract_utilities', {
       file_id: fileId
+    });
+    return response.data;
+  },
+  
+  // Batch processing method for group-based architecture
+  batchProcess: async (fileIds: string[]) => {
+    const response = await apiClient.post('/batch-ocr/batch-process', {
+      file_ids: fileIds,
+      consolidate_analysis: true,
+      auto_populate: true
+    }, { 
+      timeout: 120000 // 2 minutes for OCR processing
     });
     return response.data;
   },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { XMarkIcon, DocumentIcon, PhotoIcon } from '@heroicons/react/24/outline';
 
@@ -9,14 +9,14 @@ interface UploadedFile {
   id: string;
   progress: number;
   status: 'pending' | 'uploading' | 'completed' | 'error';
-  fileId?: string;
   error?: string;
+  readyForCallback?: boolean;
 }
 
 interface MultiFileUploadProps {
-  onFilesUploaded: (fileIds: string[]) => void;
+  onFilesUploaded: (files: Array<{id: string; filename: string; original_name: string}>) => void;
   maxFiles?: number;
-  acceptedTypes?: string[];
+  acceptedTypes?: string[] | string;
   className?: string;
 }
 
@@ -28,6 +28,29 @@ export default function MultiFileUpload({
 }: MultiFileUploadProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Handle callback for completed files asynchronously to avoid setState during render
+  useEffect(() => {
+    const readyFiles = uploadedFiles.filter(f => f.readyForCallback && f.status === 'completed');
+    
+    if (readyFiles.length > 0) {
+      const completedFiles = readyFiles.map(f => ({
+        id: f.id,
+        filename: f.file.name,
+        original_name: f.file.name
+      }));
+      
+      console.log('📤 Calling onFilesUploaded with:', completedFiles);
+      onFilesUploaded(completedFiles);
+      
+      // Clear the readyForCallback flag to avoid re-triggering
+      setUploadedFiles(prev => 
+        prev.map(f => 
+          f.readyForCallback ? { ...f, readyForCallback: false } : f
+        )
+      );
+    }
+  }, [uploadedFiles, onFilesUploaded]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     // Check if adding these files would exceed the limit
@@ -67,36 +90,39 @@ export default function MultiFileUpload({
           );
         }, 100);
 
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-        const response = await fetch(`${API_BASE_URL}/uploads/single`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          },
-          body: formData
-        });
+        try {
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+          const response = await fetch(`${API_BASE_URL}/uploads/single`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+            },
+            body: formData
+          });
 
-        clearInterval(progressInterval);
+          if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+          }
 
-        if (!response.ok) {
-          throw new Error(`Upload failed: ${response.statusText}`);
+          const result = await response.json();
+
+          // Update file with success - store backend file ID as the main id
+          setUploadedFiles(prev => 
+            prev.map(f => f.id === fileObj.id 
+              ? { 
+                  ...f, 
+                  status: 'completed', 
+                  progress: 100, 
+                  id: result.file_id  // Replace local ID with backend file ID
+                } 
+              : f)
+          );
+
+          return result.file_id;
+        } finally {
+          // Always clear the interval, regardless of success or failure
+          clearInterval(progressInterval);
         }
-
-        const result = await response.json();
-
-        // Update file with success
-        setUploadedFiles(prev => 
-          prev.map(f => f.id === fileObj.id 
-            ? { 
-                ...f, 
-                status: 'completed', 
-                progress: 100, 
-                fileId: result.file_id 
-              } 
-            : f)
-        );
-
-        return result.file_id;
       } catch (error) {
         // Update file with error
         setUploadedFiles(prev => 
@@ -118,14 +144,29 @@ export default function MultiFileUpload({
     
     setIsUploading(false);
     
+    // Store successful files for useEffect to handle callback
     if (successfulFileIds.length > 0) {
-      onFilesUploaded(successfulFileIds);
+      setUploadedFiles(currentFiles => {
+        const updatedFiles = currentFiles.map(f => 
+          f.status === 'completed' && successfulFileIds.includes(f.id) 
+            ? { ...f, readyForCallback: true }
+            : f
+        );
+        return updatedFiles;
+      });
     }
-  }, [uploadedFiles.length, maxFiles, onFilesUploaded]);
+  }, [uploadedFiles.length, maxFiles]);
 
+  // Ensure acceptedTypes is always an array, handle both string and array inputs
+  const validAcceptedTypes = Array.isArray(acceptedTypes) 
+    ? acceptedTypes 
+    : typeof acceptedTypes === 'string' 
+    ? [acceptedTypes] 
+    : ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']; // fallback default
+  
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: acceptedTypes.reduce((acc, type) => ({ ...acc, [type]: [] }), {}),
+    accept: validAcceptedTypes.reduce((acc, type) => ({ ...acc, [type]: [] }), {}),
     maxSize: 10 * 1024 * 1024, // 10MB
     disabled: isUploading || uploadedFiles.length >= maxFiles
   });

@@ -1,16 +1,54 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { GroupProvider, useGroup } from '@/components/wizard/GroupProvider';
 import { GroupLayout } from '@/components/wizard/GroupLayout';
 import { DocumentProcessingGroup } from '@/components/wizard/groups/DocumentProcessingGroup';
-import { LocationMappingGroup } from '@/components/wizard/groups/LocationMappingGroup';
-import { PropertyAssessmentGroup } from '@/components/wizard/groups/PropertyAssessmentGroup';
-import { MarketValuationGroup } from '@/components/wizard/groups/MarketValuationGroup';
-import { ReportFinalizationGroup } from '@/components/wizard/groups/ReportFinalizationGroup';
 import { useAuth } from '@/lib/auth';
 import { WIZARD_GROUPS } from '@/types/groupWizard';
+import type { WizardGroup, GroupValidation } from '@/types/groupWizard';
+
+// Placeholder components for other groups (we'll create these next)
+const LocationMappingGroup = () => (
+  <div className="p-8 text-center">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">Location Verification & Mapping</h3>
+    <p className="text-gray-600">This group will contain address verification, Google Maps integration, and infrastructure details.</p>
+    <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+      <p className="text-sm text-gray-500">Coming soon - this functionality will be migrated from the existing LocationStep component.</p>
+    </div>
+  </div>
+);
+
+const PropertyAssessmentGroup = () => (
+  <div className="p-8 text-center">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">Property Assessment</h3>
+    <p className="text-gray-600">This group will contain site characteristics, buildings, utilities, and environmental factors.</p>
+    <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+      <p className="text-sm text-gray-500">Coming soon - this functionality will combine SiteStep, BuildingsStep, UtilitiesStep, and EnvironmentalStep.</p>
+    </div>
+  </div>
+);
+
+const MarketValuationGroup = () => (
+  <div className="p-8 text-center">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">Market Analysis & Valuation</h3>
+    <p className="text-gray-600">This group will contain market research, comparables, and valuation calculations.</p>
+    <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+      <p className="text-sm text-gray-500">Coming soon - this functionality will combine MarketAnalysisStep and ValuationStep.</p>
+    </div>
+  </div>
+);
+
+const ReportFinalizationGroup = () => (
+  <div className="p-8 text-center">
+    <h3 className="text-lg font-medium text-gray-900 mb-4">Report Setup & Finalization</h3>
+    <p className="text-gray-600">This group will contain report information, client details, review, and export.</p>
+    <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+      <p className="text-sm text-gray-500">Coming soon - this functionality will combine ReportInfoStep, ClientStep, ReviewStep, and finalization.</p>
+    </div>
+  </div>
+);
 
 function GroupWizardContent() {
   const router = useRouter();
@@ -55,15 +93,10 @@ function GroupWizardContent() {
     }
   };
 
-  // Memoize validation function to prevent infinite re-renders
-  const memoizedValidateGroup = useCallback((group: any) => {
-    validateGroup(group);
-  }, []); // Remove validateGroup from dependencies to prevent infinite loops
-
   // Validate current group when switching
   useEffect(() => {
-    memoizedValidateGroup(currentGroup);
-  }, [currentGroup, memoizedValidateGroup]);
+    validateGroup(currentGroup);
+  }, [currentGroup, validateGroup]);
 
   const renderCurrentGroup = () => {
     switch (currentGroup) {
@@ -125,6 +158,22 @@ export default function CreateReportV2() {
   return (
     <GroupProvider reportId={reportId || undefined}>
       <div className="min-h-screen bg-gray-50">
+        {/* Header with version indicator */}
+        <div className="bg-blue-600 text-white py-2 px-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-sm font-medium">🚀 Group-Based Wizard (Beta)</span>
+              <span className="ml-2 px-2 py-1 bg-blue-700 rounded text-xs">v2.0</span>
+            </div>
+            <button 
+              onClick={() => router.push('/reports/create')}
+              className="text-sm text-blue-100 hover:text-white underline"
+            >
+              Switch to Original Wizard
+            </button>
+          </div>
+        </div>
+        
         <GroupWizardContent />
       </div>
     </GroupProvider>

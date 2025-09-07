@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
 import type { 
   ReportData, 
   PropertyInfo, 
@@ -72,6 +73,9 @@ export interface WizardState {
   lastSaved: Date | null;
   hasUnsavedChanges: boolean;
   
+  // AI-populated fields tracking across all steps
+  aiPopulatedFields: Record<WizardStep, Set<string>>;
+  
   // Validation
   stepValidations: Record<WizardStep, StepValidation>;
   globalErrors: string[];
@@ -116,6 +120,13 @@ export interface WizardState {
     redo: () => boolean;
     clearHistory: () => void;
     
+    // AI field tracking
+    markFieldAsAIPopulated: (step: WizardStep, fieldPath: string) => void;
+    markFieldsAsAIPopulated: (step: WizardStep, fieldPaths: string[]) => void;
+    clearAIPopulatedFields: (step?: WizardStep) => void;
+    isFieldAIPopulated: (step: WizardStep, fieldPath: string) => boolean;
+    getAIPopulatedFields: (step: WizardStep) => Set<string>;
+    
     // Utility
     getStepData: <T>(step: WizardStep) => T | undefined;
     isStepComplete: (step: WizardStep) => boolean;
@@ -137,6 +148,14 @@ const createDefaultValidations = (): Record<WizardStep, StepValidation> => {
     acc[step] = { ...defaultValidation };
     return acc;
   }, {} as Record<WizardStep, StepValidation>);
+};
+
+// Create default AI-populated fields tracking
+const createDefaultAIFields = (): Record<WizardStep, Set<string>> => {
+  return WIZARD_STEPS.reduce((acc, step) => {
+    acc[step] = new Set<string>();
+    return acc;
+  }, {} as Record<WizardStep, Set<string>>);
 };
 
 // Validation functions for each step
@@ -257,6 +276,9 @@ const stepValidators = {
   finalize: () => ({ isValid: true, errors: [], warnings: [] })
 };
 
+// Enable Immer MapSet plugin for Set object support
+enableMapSet();
+
 export const useWizardStore = create<WizardState>()(
   persist(
     immer((set, get) => ({
@@ -275,6 +297,8 @@ export const useWizardStore = create<WizardState>()(
       isSaving: false,
       lastSaved: null,
       hasUnsavedChanges: false,
+      
+      aiPopulatedFields: createDefaultAIFields(),
       
       stepValidations: createDefaultValidations(),
       globalErrors: [],
@@ -375,6 +399,7 @@ export const useWizardStore = create<WizardState>()(
               progressPercentage: 0
             };
             state.stepValidations = createDefaultValidations();
+            state.aiPopulatedFields = createDefaultAIFields();
             state.hasUnsavedChanges = true;
           });
         },
@@ -387,6 +412,7 @@ export const useWizardStore = create<WizardState>()(
             }
             
             state.stepValidations[step] = { ...defaultValidation };
+            state.aiPopulatedFields[step] = new Set<string>();
             state.hasUnsavedChanges = true;
             
             // Remove from completed steps
@@ -550,6 +576,43 @@ export const useWizardStore = create<WizardState>()(
           });
         },
         
+        markFieldAsAIPopulated: (step: WizardStep, fieldPath: string) => {
+          set((state) => {
+            // Create a new Set with the existing fields plus the new one
+            const existingFields = Array.from(state.aiPopulatedFields[step]);
+            state.aiPopulatedFields[step] = new Set([...existingFields, fieldPath]);
+          });
+        },
+        
+        markFieldsAsAIPopulated: (step: WizardStep, fieldPaths: string[]) => {
+          set((state) => {
+            // Create a new Set with all existing fields plus new ones
+            const existingFields = Array.from(state.aiPopulatedFields[step]);
+            const allFields = [...new Set([...existingFields, ...fieldPaths])];
+            state.aiPopulatedFields[step] = new Set(allFields);
+          });
+        },
+        
+        clearAIPopulatedFields: (step?: WizardStep) => {
+          set((state) => {
+            if (step) {
+              state.aiPopulatedFields[step] = new Set<string>();
+            } else {
+              state.aiPopulatedFields = createDefaultAIFields();
+            }
+          });
+        },
+        
+        isFieldAIPopulated: (step: WizardStep, fieldPath: string) => {
+          const { aiPopulatedFields } = get();
+          return aiPopulatedFields[step]?.has(fieldPath) || false;
+        },
+        
+        getAIPopulatedFields: (step: WizardStep) => {
+          const { aiPopulatedFields } = get();
+          return aiPopulatedFields[step] || new Set<string>();
+        },
+        
         getStepData: <T>(step: WizardStep): T | undefined => {
           const { reportData } = get();
           const stepKey = step.replace('_', '') as keyof ReportData;
@@ -599,8 +662,28 @@ export const useWizardStore = create<WizardState>()(
         reportData: state.reportData,
         progress: state.progress,
         stepValidations: state.stepValidations,
-        lastSaved: state.lastSaved
-      })
+        lastSaved: state.lastSaved,
+        // Convert Sets to arrays for serialization
+        aiPopulatedFields: Object.keys(state.aiPopulatedFields).reduce((acc, step) => {
+          acc[step as WizardStep] = Array.from(state.aiPopulatedFields[step as WizardStep]);
+          return acc;
+        }, {} as Record<WizardStep, string[]>)
+      }),
+      // Handle deserialization of AI fields arrays back to Sets
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const aiFields = state.aiPopulatedFields as any;
+          if (aiFields && typeof aiFields === 'object') {
+            const newAIFields = createDefaultAIFields();
+            Object.keys(aiFields).forEach(step => {
+              if (Array.isArray(aiFields[step])) {
+                newAIFields[step as WizardStep] = new Set(aiFields[step]);
+              }
+            });
+            state.aiPopulatedFields = newAIFields;
+          }
+        }
+      }
     }
   )
 );
@@ -653,5 +736,16 @@ export const useWizardHistory = () => {
     undo: state.actions.undo,
     redo: state.actions.redo,
     clearHistory: state.actions.clearHistory
+  }));
+};
+
+export const useWizardAIFields = () => {
+  return useWizardStore((state) => ({
+    aiPopulatedFields: state.aiPopulatedFields,
+    markFieldAsAIPopulated: state.actions.markFieldAsAIPopulated,
+    markFieldsAsAIPopulated: state.actions.markFieldsAsAIPopulated,
+    clearAIPopulatedFields: state.actions.clearAIPopulatedFields,
+    isFieldAIPopulated: state.actions.isFieldAIPopulated,
+    getAIPopulatedFields: state.actions.getAIPopulatedFields
   }));
 };

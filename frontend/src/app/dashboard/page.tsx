@@ -148,15 +148,32 @@ export default function DashboardPage() {
   };
 
   const handleDeleteReport = async (reportId: string) => {
-    if (confirm('Are you sure you want to delete this report? This action cannot be undone.')) {
+    const reportToDelete = reports.find(r => r.id === reportId);
+    const confirmMessage = `Are you sure you want to delete "${reportToDelete?.title || 'this report'}"?\n\nThis action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
       try {
         setError(''); // Clear any previous errors
+        
+        // Optimistic update - remove from UI immediately
+        setReports(prevReports => prevReports.filter(r => r.id !== reportId));
+        
+        // Actual API call
         await reportsAPI.delete(reportId);
-        // Reload the reports list
-        await loadData();
-        setError(''); // Ensure error is cleared after successful operation
+        
+        console.log('✅ Report deleted successfully:', reportId);
+        
       } catch (err: any) {
-        setError('Failed to delete report');
+        console.error('❌ Failed to delete report:', err);
+        
+        // Rollback optimistic update by reloading data
+        try {
+          await loadData();
+        } catch (reloadErr) {
+          console.error('❌ Failed to reload data after delete error:', reloadErr);
+        }
+        
+        setError(`Failed to delete report: ${err.message || 'Unknown error'}`);
       }
     }
   };

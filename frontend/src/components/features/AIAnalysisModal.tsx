@@ -114,35 +114,157 @@ export default function AIAnalysisModal({
         <div className="max-h-96 overflow-y-auto">
           {viewMode === 'structured' && (
             <div className="space-y-6">
-              {/* Document-specific extracted data */}
-              {analysis.extracted_data && Object.keys(analysis.extracted_data).length > 0 && (
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="text-md font-semibold text-blue-900 mb-3">
-                    Document-Specific Information
-                  </h4>
-                  {renderStructuredData(analysis.extracted_data)}
+              {/* Comprehensive data from document analysis */}
+              {analysis.document_analysis?.comprehensive_data && !analysis.document_analysis.comprehensive_data.error && (
+                <div className="space-y-4">
+                  {/* Property Identification */}
+                  {analysis.document_analysis.comprehensive_data.property_identification && (
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-blue-900 mb-3 flex items-center">
+                        📍 Property Identification
+                        <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full">
+                          {Object.keys(analysis.document_analysis.comprehensive_data.property_identification).length} fields
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.property_identification)}
+                    </div>
+                  )}
+
+                  {/* Location Details */}
+                  {analysis.document_analysis.comprehensive_data.location_details && (
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-green-900 mb-3 flex items-center">
+                        🗺️ Location Details
+                        <span className="ml-2 text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full">
+                          {Object.keys(analysis.document_analysis.comprehensive_data.location_details).length} fields
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.location_details)}
+                    </div>
+                  )}
+
+                  {/* Site Characteristics */}
+                  {analysis.document_analysis.comprehensive_data.site_characteristics && (
+                    <div className="bg-yellow-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-yellow-900 mb-3 flex items-center">
+                        🏗️ Site Characteristics
+                        <span className="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
+                          {Object.keys(analysis.document_analysis.comprehensive_data.site_characteristics).length} fields
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.site_characteristics)}
+                    </div>
+                  )}
+
+                  {/* Buildings & Improvements */}
+                  {analysis.document_analysis.comprehensive_data.buildings_improvements && (
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-purple-900 mb-3 flex items-center">
+                        🏠 Buildings & Improvements
+                        <span className="ml-2 text-xs bg-purple-200 text-purple-800 px-2 py-1 rounded-full">
+                          {Array.isArray(analysis.document_analysis.comprehensive_data.buildings_improvements) ? 
+                           analysis.document_analysis.comprehensive_data.buildings_improvements.length + ' items' :
+                           Object.keys(analysis.document_analysis.comprehensive_data.buildings_improvements).length + ' fields'}
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.buildings_improvements)}
+                    </div>
+                  )}
+
+                  {/* Legal Information */}
+                  {analysis.document_analysis.comprehensive_data.legal_information && (
+                    <div className="bg-red-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-red-900 mb-3 flex items-center">
+                        ⚖️ Legal Information
+                        <span className="ml-2 text-xs bg-red-200 text-red-800 px-2 py-1 rounded-full">
+                          {Object.keys(analysis.document_analysis.comprehensive_data.legal_information).length} fields
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.legal_information)}
+                    </div>
+                  )}
+
+                  {/* Market Analysis */}
+                  {analysis.document_analysis.comprehensive_data.market_analysis && (
+                    <div className="bg-indigo-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-indigo-900 mb-3 flex items-center">
+                        💰 Market Analysis
+                        <span className="ml-2 text-xs bg-indigo-200 text-indigo-800 px-2 py-1 rounded-full">
+                          {Object.keys(analysis.document_analysis.comprehensive_data.market_analysis).length} fields
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.market_analysis)}
+                    </div>
+                  )}
+
+                  {/* Report Information */}
+                  {analysis.document_analysis.comprehensive_data.report_information && (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center">
+                        📋 Report Information
+                        <span className="ml-2 text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded-full">
+                          {Object.keys(analysis.document_analysis.comprehensive_data.report_information).length} fields
+                        </span>
+                      </h4>
+                      {renderStructuredData(analysis.document_analysis.comprehensive_data.report_information)}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* General property data */}
-              {analysis.general_data && Object.keys(analysis.general_data).length > 0 && (
-                <div className="bg-green-50 rounded-lg p-4">
-                  <h4 className="text-md font-semibold text-green-900 mb-3">
-                    General Property Information
-                  </h4>
-                  {renderStructuredData(analysis.general_data)}
-                </div>
+              {/* Fallback for legacy data structure */}
+              {!analysis.document_analysis?.comprehensive_data && (
+                <>
+                  {/* Document-specific extracted data */}
+                  {analysis.extracted_data && Object.keys(analysis.extracted_data).length > 0 && (
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-blue-900 mb-3">
+                        Document-Specific Information (Legacy)
+                      </h4>
+                      {renderStructuredData(analysis.extracted_data)}
+                    </div>
+                  )}
+
+                  {/* General property data */}
+                  {analysis.general_data && Object.keys(analysis.general_data).length > 0 && (
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h4 className="text-md font-semibold text-green-900 mb-3">
+                        General Property Information (Legacy)
+                      </h4>
+                      {renderStructuredData(analysis.general_data)}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Error handling */}
-              {analysis.error && (
+              {(analysis.error || analysis.document_analysis?.comprehensive_data?.error) && (
                 <div className="bg-red-50 rounded-lg p-4">
                   <h4 className="text-md font-semibold text-red-900 mb-3">
                     Processing Error
                   </h4>
-                  <p className="text-red-700">{analysis.error}</p>
+                  <p className="text-red-700">
+                    {analysis.error || analysis.document_analysis?.comprehensive_data?.error}
+                  </p>
                 </div>
               )}
+
+              {/* Show extraction summary */}
+              <div className="bg-gray-50 rounded-lg p-4 border-t">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                  📊 Extraction Summary
+                </h4>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>Total sections found: {analysis.document_analysis?.comprehensive_data ? 
+                    Object.keys(analysis.document_analysis.comprehensive_data).filter(k => 
+                      k !== 'error' && analysis.document_analysis.comprehensive_data[k] && 
+                      Object.keys(analysis.document_analysis.comprehensive_data[k]).length > 0
+                    ).length : 'Unknown'}</div>
+                  <div>Document type: {documentType || 'Not specified'}</div>
+                  <div>Processing status: {analysis.document_analysis?.comprehensive_data?.error ? 
+                    'Failed' : 'Success'}</div>
+                </div>
+              </div>
             </div>
           )}
 

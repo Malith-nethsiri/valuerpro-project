@@ -6,6 +6,8 @@ import { useStepValidation } from '@/hooks/useFieldValidation';
 import { validationSchemas } from '@/hooks/useFieldValidation';
 import { filesAPI, ocrAPI } from '@/lib/api';
 import MultiFileUpload from '@/components/forms/MultiFileUpload';
+import { useWizardAIFields } from '@/store/wizardStore';
+import { getPopulatedFieldPaths, debugFieldMapping } from '@/utils/aiFieldMapping';
 
 export const IdentificationStep = () => {
   const { state, updateStepData, validateStep, populateFromAiAnalysis } = useWizard();
@@ -13,10 +15,14 @@ export const IdentificationStep = () => {
   const { errors, isValid, validate } = useStepValidation(1);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   
+  // Global AI field tracking
+  const { markFieldsAsAIPopulated, getAIPopulatedFields, isFieldAIPopulated, clearAIPopulatedFields } = useWizardAIFields();
+  
   // OCR/AI functionality state
   const [analyzing, setAnalyzing] = useState(false);
-  const [extractedData, setExtractedData] = useState<any>(null);
-  const [showExtractedData, setShowExtractedData] = useState(false);
+  const [showAIReview, setShowAIReview] = useState(false);
+  const [extractedAIData, setExtractedAIData] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('summary');
 
   const handleInputChange = (field: string, value: any, isFieldValid: boolean) => {
     updateStepData('identification', { [field]: value });
@@ -25,6 +31,22 @@ export const IdentificationStep = () => {
     if (isFieldValid && localErrors[field]) {
       setLocalErrors(prev => ({ ...prev, [field]: '' }));
     }
+    
+    // Remove AI highlight once user manually edits
+    if (isFieldAIPopulated('property_identification', field)) {
+      // Clear the AI-populated marking for this field when user manually edits it
+      const currentFields = getAIPopulatedFields('property_identification');
+      const fieldsArray = Array.from(currentFields).filter(f => f !== field);
+      markFieldsAsAIPopulated('property_identification', fieldsArray);
+    }
+  };
+
+  // Helper function to get CSS classes for AI-populated fields
+  const getFieldClasses = (fieldName: string, baseClasses: string) => {
+    const isAiPopulated = isFieldAIPopulated('property_identification', fieldName);
+    return isAiPopulated 
+      ? `${baseClasses} ring-2 ring-green-200 bg-green-50 border-green-300` 
+      : baseClasses;
   };
 
   // Validate step when data changes
@@ -32,7 +54,7 @@ export const IdentificationStep = () => {
     validate();
   }, [identification, validate]);
 
-  const handleBoundaryChange = (direction: string, value: string, isFieldValid: boolean) => {
+  const handleBoundaryChange = (direction: string, value: string) => {
     const boundaries = identification.boundaries || {};
     updateStepData('identification', { 
       boundaries: { ...boundaries, [direction]: value }
@@ -44,7 +66,7 @@ export const IdentificationStep = () => {
     return perches * 25.29285264;
   };
 
-  const handleExtentPerchesChange = (value: string | number, isFieldValid: boolean) => {
+  const handleExtentPerchesChange = (value: string | number) => {
     const perches = typeof value === 'string' ? parseFloat(value) : value;
     const sqm = calculateExtentSqm(perches || 0);
     
@@ -56,17 +78,35 @@ export const IdentificationStep = () => {
 
   // Handle multi-file upload and batch OCR processing
   const handleFilesUploaded = async (fileIds: string[]) => {
-    if (fileIds.length === 0) return;
+    console.log('🚀 Starting batch OCR processing for files:', fileIds);
+    
+    if (fileIds.length === 0) {
+      console.warn('⚠️ No files provided for processing');
+      return;
+    }
 
     setAnalyzing(true);
+    console.log('📊 Analysis state set to true - UI should show loading...');
+    
     try {
       // Process multiple files with batch OCR (new API)
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      const batchResponse = await fetch(`${API_BASE_URL}/batch-ocr/batch-process`, {
+      const batchURL = `${API_BASE_URL}/batch-ocr/batch-process`;
+      const authToken = localStorage.getItem('access_token');
+      
+      console.log('📡 Making API request to:', batchURL);
+      console.log('🔑 Auth token present:', !!authToken);
+      console.log('📋 Request payload:', { 
+        file_ids: fileIds, 
+        consolidate_analysis: true, 
+        auto_populate: true 
+      });
+      
+      const batchResponse = await fetch(batchURL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           file_ids: fileIds,
@@ -75,325 +115,278 @@ export const IdentificationStep = () => {
         }),
       });
 
+      console.log('📨 API Response status:', batchResponse.status, batchResponse.statusText);
+
       if (!batchResponse.ok) {
-        throw new Error('Batch processing failed');
+        const errorText = await batchResponse.text();
+        console.error('❌ API Error response:', errorText);
+        throw new Error(`Batch processing failed: ${batchResponse.status} ${batchResponse.statusText} - ${errorText}`);
       }
 
       const batchResult = await batchResponse.json();
+      console.log('✅ Batch OCR completed successfully');
+      console.log('📊 Raw batch result structure:', {
+        hasFiles: !!batchResult.files,
+        filesCount: batchResult.files?.length || 0,
+        batchResultKeys: Object.keys(batchResult)
+      });
+      console.log('📊 Full batch result:', JSON.stringify(batchResult, null, 2));
       
-      // DEBUG: Log the full batch result for analysis
-      console.log('=== BATCH OCR RESULT DEBUG ===');
-      console.log('Batch result:', JSON.stringify(batchResult, null, 2));
+      // Simplified AI data filtering - just check if files exist and have AI analysis
+      console.log('🔍 Filtering files for AI analysis...');
+      console.log('📁 All files in batch:', batchResult.files?.map((f: any, i: number) => ({
+        index: i,
+        success: f.success,
+        hasAiAnalysis: !!f.ai_analysis,
+        fileName: f.filename || 'unknown'
+      })));
       
-      // Process results from all files - NEW API FORMAT
-      let successfulFiles: any[] = [];
-      let hasComprehensiveData = false;
-
-      if (batchResult.files && batchResult.files.length > 0) {
-        successfulFiles = batchResult.files.filter((f: any) => !f.error);
-        console.log('Batch result files:', batchResult.files);
-        console.log('Successful files:', successfulFiles);
-        
-        if (successfulFiles.length > 0) {
-          // Check if we have comprehensive data from the NEW API format
-          console.log('=== CHECKING FOR COMPREHENSIVE DATA ===');
-          for (let i = 0; i < successfulFiles.length; i++) {
-            const file = successfulFiles[i];
-            console.log(`File ${i + 1}:`, {
-              filename: file.filename,
-              has_ai_analysis: !!file.ai_analysis,
-              document_type: file.document_type,
-              extracted_text_length: file.ocr_text?.length || 0,
-              ai_data_keys: file.ai_analysis ? Object.keys(file.ai_analysis) : null
-            });
-          }
-
-          hasComprehensiveData = successfulFiles.some(f =>
-            f.ai_analysis && !f.ai_analysis.error
-          );
-          
-          console.log('Has comprehensive data overall:', hasComprehensiveData);
-          
-          if (hasComprehensiveData) {
-            // SIMPLE DIRECT APPROACH - Just populate the form fields directly
-            console.log('🚀 DIRECT FORM POPULATION - Bypassing complex merger');
-            const firstFileWithComp = successfulFiles.find(f =>
-              f.ai_analysis && !f.ai_analysis.error
-            );
-
-            if (firstFileWithComp) {
-              const data = firstFileWithComp.ai_analysis;
-              console.log('📋 Raw data received:', JSON.stringify(data, null, 2));
-              
-              // DIRECT FIELD MAPPING - No complex processing
-              const updates: any = {};
-              
-              // DEBUGGING: Let's see exactly what data structure we have
-              console.log('🔍 DEBUGGING - Raw data received:', data);
-              console.log('🔍 DEBUGGING - data keys:', Object.keys(data || {}));
-              console.log('🔍 DEBUGGING - data.property_identification:', data?.property_identification);
-              console.log('🔍 DEBUGGING - Direct data fields:', {
-                lot_number: data?.lot_number,
-                plan_number: data?.plan_number,
-                surveyor_name: data?.surveyor_name,
-                extent_perches: data?.extent_perches
-              });
-              
-              // Check both nested and flat structures
-              const propId = data.property_identification || data;
-              const location = data.location_details || data.location || {};
-              const legal = data.legal_information || data;
-              
-              console.log('🔍 DEBUGGING - After structure check:');
-              console.log('  - propId:', propId);
-              console.log('  - legal:', legal);
-              console.log('  - propId.lot_number:', propId?.lot_number);
-              console.log('  - propId.plan_number:', propId?.plan_number);
-              
-              // Map the fields directly
-              if (propId.lot_number) updates.lot_number = propId.lot_number;
-              if (propId.plan_number) updates.plan_number = propId.plan_number;
-              if (propId.extent_perches) updates.extent_perches = propId.extent_perches;
-              if (propId.boundaries) updates.boundaries = propId.boundaries;
-              if (propId.surveyor_name || legal.surveyor_name) {
-                updates.surveyor_name = propId.surveyor_name || legal.surveyor_name;
-              }
-              if (propId.land_name) updates.land_name = propId.land_name;
-              if (propId.plan_date || legal.plan_date) {
-                updates.plan_date = propId.plan_date || legal.plan_date;
-              }
-              
-              console.log('📝 Direct updates to apply:', updates);
-              
-              // Apply updates directly - ONE BIG UPDATE
-              if (Object.keys(updates).length > 0) {
-                console.log('🔥 APPLYING ALL UPDATES AT ONCE:', updates);
-                updateStepData('identification', updates);
-                console.log('✅ DONE - All fields updated in one call');
-              } else {
-                console.log('❌ NO UPDATES TO APPLY - Check data structure!');
-              }
-            }
-          } else {
-            // Fallback to parsing data for preview/manual application
-            const extracted = parseExtractedDataFromBatch(batchResult);
-            console.log('Using fallback data parsing - parsed:', extracted);
-            setExtractedData(extracted);
-            setShowExtractedData(true);
-          }
-        }
+      const filesWithAI = batchResult.files?.filter((file: any) => 
+        file.success && file.ai_analysis
+      ) || [];
+      
+      console.log(`✅ Found ${filesWithAI.length} files with AI analysis`);
+      if (filesWithAI.length > 0) {
+        console.log('📋 Files with AI data:', filesWithAI.map((f: any, i: number) => ({
+          index: i,
+          filename: f.filename,
+          hasAnalysis: !!f.ai_analysis,
+          analysisKeys: f.ai_analysis ? Object.keys(f.ai_analysis) : []
+        })));
       }
       
-      // Use consolidated analysis if available and no comprehensive data was already applied
-      if (batchResult.consolidated_analysis && !hasComprehensiveData) {
-        const consolidated = parseConsolidatedData({
-          ...batchResult.consolidated_analysis,
-          auto_population_data: batchResult.auto_population_data,
+      if (filesWithAI.length > 0) {
+        // Get the first file with AI data
+        const fileWithAI = filesWithAI[0];
+        const aiData = fileWithAI.ai_analysis;
+        
+        console.log('🤖 AI data extracted from:', fileWithAI.filename);
+        console.log('📋 Raw AI Data structure:', JSON.stringify(aiData, null, 2));
+        
+        // Process and normalize AI data for display
+        console.log('⚙️ Processing AI data for display...');
+        const processedData = processAIDataForDisplay(aiData);
+        
+        console.log('🎯 Processing result:', {
+          hasProcessedData: !!processedData,
+          processedDataKeys: processedData ? Object.keys(processedData) : [],
+          dataSize: processedData ? Object.keys(processedData).length : 0
         });
-        console.log('Consolidated analysis:', batchResult.consolidated_analysis);
-        console.log('Parsed consolidated data:', consolidated);
-        setExtractedData(consolidated);
-        setShowExtractedData(true);
-      } else if (batchResult.consolidated_analysis && hasComprehensiveData) {
-        console.log('Skipping consolidated analysis - comprehensive data already applied');
+        
+        if (processedData && Object.keys(processedData).length > 0) {
+          console.log('✅ Successfully processed AI data for display');
+          console.log('📊 Final processed data:', JSON.stringify(processedData, null, 2));
+          setExtractedAIData(processedData);
+          setShowAIReview(true);
+          console.log('🎉 AI Review modal should now be visible');
+        } else {
+          console.warn('⚠️ No usable AI data found after processing');
+          console.warn('🔍 Debug info - original AI data keys:', Object.keys(aiData));
+          alert('📊 Analysis Complete - Limited Data\n\nThe AI analysis found some data but it may not contain comprehensive property information.\n\n💡 Suggestions:\n• Upload additional property documents\n• Try documents with more detailed information\n• Review what was extracted and fill missing fields manually');
+        }
+      } else {
+        console.warn('⚠️ No files with AI analysis found');
+        alert('📄 Analysis Complete - No Data Found\n\nThe documents were processed successfully, but no structured property data could be extracted.\n\n💡 Tips:\n• Ensure documents contain clear property information\n• Try uploading higher quality images or PDFs\n• Check that documents are property-related (title deeds, surveys, plans)\n\n🔄 You can upload different documents or fill forms manually.');
       }
       
     } catch (error) {
       console.error('Failed to process documents:', error);
-      alert('Failed to process documents. Please try again.');
+      const errorMessage = error.message || 'Unknown error occurred';
+      alert(`❌ Document Processing Failed\n\n${errorMessage}\n\n🔧 Troubleshooting:\n• Check your internet connection\n• Ensure files are not corrupted\n• Try uploading fewer files at once\n• Contact support if the issue persists`);
     } finally {
       setAnalyzing(false);
     }
   };
 
-  // Parse extracted data from batch OCR results (NEW FORMAT)
-  const parseExtractedDataFromBatch = (batchResult: any) => {
-    const extracted: any = {};
+  // Process and normalize AI data for display
+  const processAIDataForDisplay = (aiData: any) => {
+    console.log('🔄 Processing AI data for display...');
     
-    // Find the best data from successful files
-    const successfulFiles = batchResult.files.filter((f: any) => !f.error && f.ai_analysis);
+    if (!aiData || typeof aiData !== 'object') {
+      console.warn('❌ No valid AI data provided');
+      return null;
+    }
 
-    for (const file of successfulFiles) {
-      const aiData = file.ai_analysis;
-      
-      // Handle both comprehensive and specific extracted data
-      let data = {};
-      if (aiData.property_identification) {
-        // Use comprehensive data structure
-        data = {
-          lot_number: aiData.property_identification.lot_number,
-          plan_number: aiData.property_identification.plan_number,
-          plan_date: aiData.property_identification.plan_date,
-          surveyor_name: aiData.property_identification.surveyor_name,
-          extent_perches: aiData.property_identification.extent_perches,
-          boundaries: aiData.property_identification.boundaries,
-          location: aiData.location_details,
-        };
-      } else {
-        // Use specific extracted data
-        data = aiData.extracted_data || aiData;
-      }
-      
-      // Merge data from all files, prioritizing survey plans
-      if (file.document_type === 'survey_plan' || !extracted.lot_number) {
-        Object.assign(extracted, {
-          lot_number: data.lot_number || extracted.lot_number,
-          plan_number: data.plan_number || extracted.plan_number,
-          plan_date: data.plan_date || extracted.plan_date,
-          surveyor_name: data.surveyor_name || extracted.surveyor_name,
-          extent_perches: data.extent_perches || extracted.extent_perches,
-          boundaries: data.boundaries || extracted.boundaries,
-          location: data.location || extracted.location,
-        });
-      }
-      
-      // Add deed information if available
-      if (file.document_type === 'deed' && aiData.legal_information) {
-        Object.assign(extracted, {
-          deed_number: aiData.legal_information.deed_number || extracted.deed_number,
-          deed_date: aiData.legal_information.deed_date || extracted.deed_date,
-        });
-      }
+    let processedData: any = {};
+    
+    // Handle different AI data formats
+    console.log('🔍 Detecting AI data format...');
+    
+    // Format 1: Direct comprehensive data
+    if (aiData.comprehensive_data) {
+      console.log('📋 Format 1: Direct comprehensive data');
+      processedData = { ...aiData.comprehensive_data };
     }
-    
-    return extracted;
-  };
-
-  // Parse consolidated analysis data
-  const parseConsolidatedData = (consolidatedAnalysis: any) => {
-    const extracted: any = {};
-    
-    // Extract from property details in consolidated analysis
-    const propertyDetails = consolidatedAnalysis.property_details || {};
-    const autoPopulationData = consolidatedAnalysis.auto_population_data || {};
-    
-    // Extract location details
-    if (propertyDetails.location) {
-      const location = propertyDetails.location;
-      extracted.village = location.village;
-      extracted.grama_niladhari_division = location.grama_niladhari_division;
-      extracted.divisional_secretariat = location.divisional_secretariat;
-      extracted.district = location.district;
-      extracted.province = location.province;
+    // Format 2: Document analysis with comprehensive data
+    else if (aiData.document_analysis?.comprehensive_data) {
+      console.log('📋 Format 2: Document analysis with comprehensive data');
+      processedData = { ...aiData.document_analysis.comprehensive_data };
     }
-    
-    // Extract boundaries
-    if (propertyDetails.boundaries) {
-      extracted.boundaries = propertyDetails.boundaries;
-    }
-    
-    // Extract from auto-population data
-    if (autoPopulationData.property_reference) {
-      extracted.property_reference = autoPopulationData.property_reference;
-    }
-    if (autoPopulationData.property_type) {
-      extracted.property_type = autoPopulationData.property_type;
-    }
-    if (autoPopulationData.land_area) {
-      extracted.land_area = autoPopulationData.land_area;
-    }
-    
-    // Extract encumbrances
-    if (propertyDetails.encumbrances) {
-      extracted.encumbrances = propertyDetails.encumbrances;
-    }
-    
-    // Extract deed date
-    if (propertyDetails.deed_date) {
-      extracted.deed_date = propertyDetails.deed_date;
-    }
-    
-    // Extract document types analyzed
-    if (consolidatedAnalysis.document_types_found) {
-      extracted.document_types = consolidatedAnalysis.document_types_found;
-    }
-    
-    return extracted;
-  };
-
-  // Parse extracted data from AI analysis (legacy single file)
-  const parseExtractedData = (analysisResponse: any, docType: 'survey' | 'deed') => {
-    // Extract from the correct nested structure returned by the backend API
-    const extracted: any = {};
-    const documentAnalysis = analysisResponse.document_analysis;
-    const extractedData = documentAnalysis?.extracted_data || {};
-    const generalData = documentAnalysis?.general_data || {};
-    
-    if (docType === 'survey') {
-      // Extract survey plan specific fields from correct nested structure
-      extracted.lot_number = extractedData.lot_number || generalData.lot_number;
-      extracted.plan_number = extractedData.plan_number;
-      extracted.plan_date = extractedData.plan_date;
-      extracted.surveyor_name = extractedData.surveyor_name;
-      extracted.land_name = extractedData.land_name || generalData.property_address;
-      extracted.extent_perches = extractedData.extent ? parseFloat(extractedData.extent.split(' ')[0]) : null;
-      extracted.boundaries = {
-        north: extractedData.boundaries?.north,
-        south: extractedData.boundaries?.south,
-        east: extractedData.boundaries?.east,
-        west: extractedData.boundaries?.west
+    // Format 3: Legacy extracted data
+    else if (aiData.property_identification || aiData.location_details) {
+      console.log('📋 Format 3: Legacy extracted data');
+      // Map legacy data to comprehensive format
+      processedData = {
+        property_identification: aiData.property_identification || {},
+        location_details: aiData.location_details || {},
+        site_characteristics: aiData.site_characteristics || {},
+        buildings_improvements: aiData.buildings_improvements || [],
+        utilities_assessment: aiData.utilities_assessment || {},
+        market_analysis: aiData.market_analysis || {},
+        legal_information: aiData.legal_information || {},
       };
-      
-      // Also extract general property data
-      if (generalData.owner_name) extracted.title_owner = generalData.owner_name;
-      if (generalData.location_details?.village) extracted.land_name = generalData.location_details.village;
-      
-    } else if (docType === 'deed') {
-      // Extract deed specific fields from correct nested structure
-      extracted.title_owner = extractedData.parties?.purchaser || extractedData.parties?.vendor || generalData.owner_name;
-      extracted.deed_no = extractedData.deed_number;
-      extracted.deed_date = extractedData.deed_date;
-      extracted.notary = extractedData.notary_attorney;
-      extracted.interest = 'freehold'; // Default, could be enhanced based on deed analysis
-      
-      // Also extract from general data
-      if (extractedData.lot_number) extracted.lot_number = extractedData.lot_number;
-      if (extractedData.plan_reference) extracted.plan_number = extractedData.plan_reference;
+
+      // Add other legacy sections if they exist
+      if (aiData.transport_access) processedData.transport_access = aiData.transport_access;
+      if (aiData.environmental_factors) processedData.environmental_factors = aiData.environmental_factors;
+      if (aiData.planning_zoning) processedData.planning_zoning = aiData.planning_zoning;
+      if (aiData.locality_analysis) processedData.locality_analysis = aiData.locality_analysis;
     }
+    // Format 4: Direct flat structure
+    else {
+      console.log('📋 Format 4: Direct flat structure');
+      if (typeof aiData === 'object' && Object.keys(aiData).length > 0) {
+        // Map flat structure to comprehensive format
+        processedData = {
+          property_identification: aiData,
+          // Add more fields as needed
+        };
+      }
+
+      // Copy other sections directly
+      Object.keys(aiData).forEach(key => {
+        if (!processedData[key] && typeof aiData[key] === 'object') {
+          processedData[key] = aiData[key];
+        }
+      });
+    }
+
+    console.log('🎯 Processed data sections:', Object.keys(processedData));
+
+    // Add confidence level if available
+    if (aiData.confidence) {
+      processedData.confidence = aiData.confidence;
+    }
+
+    // Clean up empty or null values
+    const cleanedData = cleanupDataForDisplay(processedData);
     
-    return extracted;
+    console.log('✨ Final cleaned data:', cleanedData);
+    return cleanedData;
   };
 
-  // Apply extracted data to form and auto-populate other wizard steps
-  const applyExtractedData = () => {
-    if (!extractedData) return;
+  // Clean up data by removing empty values
+  const cleanupDataForDisplay = (data: any): any => {
+    if (!data || typeof data !== 'object') return data;
     
-    // Apply to identification step (current behavior)
-    Object.keys(extractedData).forEach(key => {
-      if (extractedData[key] !== null && extractedData[key] !== undefined && extractedData[key] !== '') {
-        if (key === 'boundaries') {
-          updateStepData('identification', { [key]: extractedData[key] });
-        } else {
-          updateStepData('identification', { [key]: extractedData[key] });
+    const cleaned: any = {};
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key];
+      
+      if (value === null || value === undefined || value === '') {
+        return; // Skip empty values
+      }
+      
+      if (Array.isArray(value)) {
+        const cleanedArray = value.filter(item => 
+          item !== null && item !== undefined && item !== ''
+        );
+        if (cleanedArray.length > 0) {
+          cleaned[key] = cleanedArray;
         }
+      } else if (typeof value === 'object') {
+        const cleanedObject = cleanupDataForDisplay(value);
+        if (Object.keys(cleanedObject).length > 0) {
+          cleaned[key] = cleanedObject;
+        }
+      } else {
+        cleaned[key] = value;
       }
     });
-
-    // Use centralized auto-population to fill other wizard steps
-    // Need to reconstruct the full AI analysis format for the centralized function
-    // Determine document type from extracted data or use a fallback
-    const detectedDocumentType = extractedData?.document_type || 
-      (extractedData?.plan_number ? 'survey_plan' : 'deed');
     
-    const fullAiAnalysis = {
-      document_analysis: {
-        document_type: detectedDocumentType,
-        extracted_data: extractedData,
-        general_data: extractedData // Include general data as well
-      }
-    };
-
-    // Call centralized auto-population
-    populateFromAiAnalysis(fullAiAnalysis);
-    
-    setShowExtractedData(false);
-    alert('Data applied successfully to all relevant wizard steps! Please review and adjust as needed.');
+    return cleaned;
   };
 
-  // Reject extracted data
-  const rejectExtractedData = () => {
-    setExtractedData(null);
-    setShowExtractedData(false);
+  // Apply AI data across all wizard steps using the proper WizardProvider function
+  const applyAIDataToForm = async (aiData: any) => {
+    console.log('Applying AI data across all wizard steps using WizardProvider...');
+    console.log('AI Data structure:', aiData);
+    
+    try {
+      // Use the existing, proper cross-step data application function from WizardProvider
+      // This function properly uses SmartDataMerger and applies data to ALL wizard steps
+      populateFromAiAnalysis(aiData);
+      
+      // Use comprehensive field mapping to track AI-populated fields across ALL wizard steps
+      const populatedFieldsByStep = getPopulatedFieldPaths(aiData);
+      console.log('📍 AI Field Mapping Results:', debugFieldMapping(aiData));
+      console.log('🎯 Fields to be highlighted by step:', populatedFieldsByStep);
+      
+      // Apply field highlighting to ALL wizard steps
+      Object.keys(populatedFieldsByStep).forEach(stepKey => {
+        const step = stepKey as keyof typeof populatedFieldsByStep;
+        const fieldsForStep = populatedFieldsByStep[step];
+        if (fieldsForStep.length > 0) {
+          console.log(`✨ Marking ${fieldsForStep.length} fields as AI-populated for step: ${step}`);
+          markFieldsAsAIPopulated(step, fieldsForStep);
+        }
+      });
+      
+      return {
+        success: true,
+        message: 'AI data successfully applied across all wizard steps'
+      };
+      
+    } catch (error) {
+      console.error('Error applying AI data:', error);
+      return {
+        success: false,
+        message: `Error applying data: ${error.message}`
+      };
+    }
+  };
+  
+  // Handle user accepting AI data with enhanced feedback
+  const handleAcceptAIData = async () => {
+    if (extractedAIData) {
+      const result = await applyAIDataToForm(extractedAIData);
+      setShowAIReview(false);
+      
+      if (result.success) {
+        // Create a more detailed and user-friendly success message
+        const stepCount = result.stepsAffected || 1;
+        const stepWord = stepCount === 1 ? 'step' : 'steps';
+        const fieldWord = result.fieldsUpdated === 1 ? 'field' : 'fields';
+        
+        const message = `🎉 AI Analysis Complete!\n\n✅ Successfully applied data to ${result.fieldsUpdated} ${fieldWord} across ${stepCount} wizard ${stepWord}.\n\n💡 Look for highlighted fields (green border) throughout the wizard - these were populated by AI.\n\n📋 You can now:\n• Review the populated data in each step\n• Edit any field to override AI suggestions\n• Navigate through the wizard to see all changes`;
+        
+        alert(message);
+      } else {
+        alert(`❌ Unable to apply AI data: ${result.message}`);
+      }
+    }
+  };
+
+  // Handle user declining AI data
+  const handleDeclineAIData = () => {
+    setShowAIReview(false);
+    setExtractedAIData(null);
+    
+    // Clear any existing AI-populated field markings since user declined
+    clearAIPopulatedFields();
+    
+    // Provide feedback to user
+    alert('📋 AI data declined.\n\nYou can:\n• Upload different documents for re-analysis\n• Fill out the forms manually\n• Try uploading again later');
+  };
+
+  // Helper function to convert field names to title case
+  const toTitleCase = (str: string) => {
+    return str
+      .replace(new RegExp('_', 'g'), ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   return (
@@ -407,7 +400,7 @@ export const IdentificationStep = () => {
         </p>
       </div>
 
-      {/* AI Document Upload Section - Moved to top */}
+      {/* AI Document Upload Section */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
         <h4 className="text-lg font-medium text-blue-900 mb-3 flex items-center">
           🤖 AI Document Analysis
@@ -416,12 +409,13 @@ export const IdentificationStep = () => {
           Upload your survey plan or deed to automatically extract property identification details using OCR and AI technology.
         </p>
         
-        <MultiFileUpload
-          onFilesUploaded={handleFilesUploaded}
-          maxFiles={10}
-          acceptedTypes={['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff']}
-          className="mb-4"
-        />
+        <div className="bg-white border border-blue-200 rounded p-4">
+          <MultiFileUpload
+            onFilesUploaded={handleFilesUploaded}
+            maxFiles={5}
+            acceptedTypes={['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/tiff']}
+          />
+        </div>
         
         {analyzing && (
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
@@ -431,48 +425,6 @@ export const IdentificationStep = () => {
           </div>
         )}
       </div>
-
-      {/* Extracted Data Review */}
-      {showExtractedData && extractedData && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h4 className="text-lg font-medium text-yellow-900 mb-3">
-            📊 Extracted Data - Review & Apply
-          </h4>
-          <p className="text-sm text-yellow-800 mb-4">
-            The AI has extracted the following data from your document. Please review for accuracy before applying to the form.
-          </p>
-          
-          <div className="bg-white rounded border p-4 mb-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              {Object.entries(extractedData).map(([key, value]) => (
-                value && (
-                  <div key={key}>
-                    <strong className="text-gray-700 capitalize">{key.replace(/_/g, ' ')}: </strong>
-                    <span className="text-gray-900">
-                      {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
-                    </span>
-                  </div>
-                )
-              ))}
-            </div>
-          </div>
-          
-          <div className="flex space-x-3">
-            <button
-              onClick={applyExtractedData}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              ✅ Apply Data
-            </button>
-            <button
-              onClick={rejectExtractedData}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
-            >
-              ❌ Reject Data
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Step-level validation errors */}
       {errors.length > 0 && (
@@ -485,31 +437,37 @@ export const IdentificationStep = () => {
       )}
 
       {/* Survey Plan Details */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-blue-900 mb-4">Survey Plan Information</h4>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h4 className="text-lg font-medium text-gray-900 mb-4">Survey Plan Details</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ValidatedInput
-            label="Lot Number"
-            fieldName="lot_number"
-            validation={validationSchemas.lotNumber}
-            value={identification.lot_number || ''}
-            onChange={(value, isValid) => handleInputChange('lot_number', value, isValid)}
-            placeholder="e.g., 15"
-            helpText="As shown on the survey plan"
-            required
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label htmlFor="lot-number" className="block text-sm font-medium text-gray-700 mb-2">
+              Lot Number *
+            </label>
+            <input
+              type="text"
+              id="lot-number"
+              value={identification.lot_number || ''}
+              onChange={(e) => handleInputChange('lot_number', e.target.value, true)}
+              className={getFieldClasses('lot_number', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
+              placeholder="e.g., 25"
+            />
+          </div>
 
-          <ValidatedInput
-            label="Plan Number"
-            fieldName="plan_number"
-            validation={validationSchemas.planNumber}
-            value={identification.plan_number || ''}
-            onChange={(value, isValid) => handleInputChange('plan_number', value, isValid)}
-            placeholder="e.g., 1035"
-            helpText="Survey plan reference number"
-            required
-          />
+          <div>
+            <label htmlFor="plan-number" className="block text-sm font-medium text-gray-700 mb-2">
+              Plan Number *
+            </label>
+            <input
+              type="text"
+              id="plan-number"
+              value={identification.plan_number || ''}
+              onChange={(e) => handleInputChange('plan_number', e.target.value, true)}
+              className={getFieldClasses('plan_number', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
+              placeholder="e.g., 1569"
+            />
+          </div>
 
           <div>
             <label htmlFor="plan-date" className="block text-sm font-medium text-gray-700 mb-2">
@@ -519,46 +477,18 @@ export const IdentificationStep = () => {
               type="date"
               id="plan-date"
               value={identification.plan_date ? identification.plan_date.split('T')[0] : ''}
-              onChange={(e) => handleInputChange('plan_date', e.target.value ? new Date(e.target.value).toISOString() : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label htmlFor="surveyor-name" className="block text-sm font-medium text-gray-700 mb-2">
-              Licensed Surveyor
-            </label>
-            <input
-              type="text"
-              id="surveyor-name"
-              value={identification.surveyor_name || ''}
-              onChange={(e) => handleInputChange('surveyor_name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., W.K. Perera, Licensed Surveyor"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="land-name" className="block text-sm font-medium text-gray-700 mb-2">
-              Land Name
-            </label>
-            <input
-              type="text"
-              id="land-name"
-              value={identification.land_name || ''}
-              onChange={(e) => handleInputChange('land_name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Name of the land (if applicable)"
+              onChange={(e) => handleInputChange('plan_date', e.target.value ? new Date(e.target.value).toISOString() : '', true)}
+              className={getFieldClasses('plan_date', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
             />
           </div>
         </div>
       </div>
 
       {/* Extent */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-green-900 mb-4">Land Extent</h4>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h4 className="text-lg font-medium text-gray-900 mb-4">Property Extent</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label htmlFor="extent-perches" className="block text-sm font-medium text-gray-700 mb-2">
               Extent (Perches) *
@@ -569,8 +499,8 @@ export const IdentificationStep = () => {
               step="0.01"
               value={identification.extent_perches || ''}
               onChange={(e) => handleExtentPerchesChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., 13.8"
+              className={getFieldClasses('extent_perches', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
+              placeholder="e.g., 15.5"
             />
           </div>
 
@@ -583,176 +513,179 @@ export const IdentificationStep = () => {
               id="extent-sqm"
               step="0.01"
               value={identification.extent_sqm ? identification.extent_sqm.toFixed(2) : ''}
-              onChange={(e) => handleInputChange('extent_sqm', parseFloat(e.target.value) || 0)}
+              onChange={(e) => handleInputChange('extent_sqm', parseFloat(e.target.value) || 0, true)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Auto-calculated"
+              readOnly
             />
             <p className="text-xs text-gray-500 mt-1">Auto-calculated from perches</p>
-          </div>
-
-          <div>
-            <label htmlFor="extent-local" className="block text-sm font-medium text-gray-700 mb-2">
-              Local Format
-            </label>
-            <input
-              type="text"
-              id="extent-local"
-              value={identification.extent_local || ''}
-              onChange={(e) => handleInputChange('extent_local', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., 2A-3R-15.5P"
-            />
-            <p className="text-xs text-gray-500 mt-1">Acres-Roods-Perches format</p>
           </div>
         </div>
       </div>
 
       {/* Boundaries */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-yellow-900 mb-4">Property Boundaries</h4>
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h4 className="text-lg font-medium text-gray-900 mb-4">Property Boundaries</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label htmlFor="boundary-north" className="block text-sm font-medium text-gray-700 mb-2">
-              North Boundary
+              North
             </label>
             <input
               type="text"
               id="boundary-north"
               value={identification.boundaries?.north || ''}
               onChange={(e) => handleBoundaryChange('north', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className={getFieldClasses('boundary_north', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
               placeholder="e.g., Lot 7 (6m road)"
             />
           </div>
 
           <div>
             <label htmlFor="boundary-south" className="block text-sm font-medium text-gray-700 mb-2">
-              South Boundary
+              South
             </label>
             <input
               type="text"
               id="boundary-south"
               value={identification.boundaries?.south || ''}
               onChange={(e) => handleBoundaryChange('south', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className={getFieldClasses('boundary_south', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
               placeholder="e.g., Lot 12"
             />
           </div>
 
           <div>
             <label htmlFor="boundary-east" className="block text-sm font-medium text-gray-700 mb-2">
-              East Boundary
+              East
             </label>
             <input
               type="text"
               id="boundary-east"
               value={identification.boundaries?.east || ''}
               onChange={(e) => handleBoundaryChange('east', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className={getFieldClasses('boundary_east', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
               placeholder="e.g., Lot 108 (1m drain)"
             />
           </div>
 
           <div>
             <label htmlFor="boundary-west" className="block text-sm font-medium text-gray-700 mb-2">
-              West Boundary
+              West
             </label>
             <input
               type="text"
               id="boundary-west"
               value={identification.boundaries?.west || ''}
               onChange={(e) => handleBoundaryChange('west', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className={getFieldClasses('boundary_west', "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500")}
               placeholder="e.g., Lot 10"
             />
           </div>
         </div>
       </div>
 
-      {/* Title Information */}
-      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-        <h4 className="text-md font-medium text-purple-900 mb-4">Title Information</h4>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="title-owner" className="block text-sm font-medium text-gray-700 mb-2">
-              Title Owner
-            </label>
-            <input
-              type="text"
-              id="title-owner"
-              value={identification.title_owner || ''}
-              onChange={(e) => handleInputChange('title_owner', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Owner name"
-            />
-          </div>
+      {/* AI Review Modal */}
+      {showAIReview && extractedAIData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-900">🤖 AI Extracted Property Data</h3>
+              <button
+                onClick={handleDeclineAIData}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
 
-          <div>
-            <label htmlFor="deed-no" className="block text-sm font-medium text-gray-700 mb-2">
-              Deed Number
-            </label>
-            <input
-              type="text"
-              id="deed-no"
-              value={identification.deed_no || ''}
-              onChange={(e) => handleInputChange('deed_no', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Deed number"
-            />
-          </div>
+            {/* Tab Navigation */}
+            <div className="flex border-b border-gray-200 mb-4">
+              {[
+                { id: 'summary', label: '📊 Summary', icon: '🏠' },
+                { id: 'identification', label: 'Property ID', icon: '🏠' },
+                { id: 'location', label: 'Location', icon: '📍' },
+                { id: 'site', label: 'Site Details', icon: '🌍' },
+                { id: 'buildings', label: 'Buildings', icon: '🏢' },
+                { id: 'utilities', label: 'Utilities', icon: '⚡' },
+                { id: 'market', label: 'Market', icon: '💰' },
+                { id: 'legal', label: 'Legal', icon: '⚖️' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+                    activeTab === tab.id
+                      ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-500'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
 
-          <div>
-            <label htmlFor="deed-date" className="block text-sm font-medium text-gray-700 mb-2">
-              Deed Date
-            </label>
-            <input
-              type="date"
-              id="deed-date"
-              value={identification.deed_date ? identification.deed_date.split('T')[0] : ''}
-              onChange={(e) => handleInputChange('deed_date', e.target.value ? new Date(e.target.value).toISOString() : '')}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+            {/* Tab Content */}
+            <div className="space-y-4">
+              {activeTab === 'summary' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-3">📊 Data Extraction Summary</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {Object.entries(extractedAIData).map(([section, data]) => {
+                      if (!data || typeof data !== 'object') return null;
+                      const fieldCount = Array.isArray(data) ? data.length : Object.keys(data).filter(key => data[key]).length;
+                      if (fieldCount === 0) return null;
+                      
+                      return (
+                        <div key={section} className="bg-white p-2 rounded border">
+                          <span className="font-medium text-gray-700 capitalize">{toTitleCase(section)}:</span>
+                          <span className="ml-2 text-blue-600">{fieldCount} fields</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Confidence Level */}
+                  {extractedAIData.confidence && (
+                    <div className="mt-4 p-3 bg-white border rounded">
+                      <div className="flex items-center">
+                        <span className="font-medium text-gray-700">AI Confidence Level:</span>
+                        <span className={
+                          "ml-2 px-2 py-1 rounded text-xs font-semibold " +
+                          (extractedAIData.confidence === 'high' ? 'bg-green-100 text-green-800' :
+                           extractedAIData.confidence === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                           'bg-red-100 text-red-800')
+                        }>
+                          {extractedAIData.confidence.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-          <div>
-            <label htmlFor="notary" className="block text-sm font-medium text-gray-700 mb-2">
-              Notary Public
-            </label>
-            <input
-              type="text"
-              id="notary"
-              value={identification.notary || ''}
-              onChange={(e) => handleInputChange('notary', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Notary name"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="interest" className="block text-sm font-medium text-gray-700 mb-2">
-              Interest Type
-            </label>
-            <select
-              id="interest"
-              value={identification.interest || 'freehold'}
-              onChange={(e) => handleInputChange('interest', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="freehold">Freehold</option>
-              <option value="leasehold">Leasehold</option>
-            </select>
+            {/* Action Buttons */}
+            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleDeclineAIData}
+                className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Decline
+              </button>
+              <button
+                onClick={handleAcceptAIData}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Accept & Apply to Form
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="mt-4 p-3 bg-purple-100 rounded border border-purple-200">
-          <p className="text-sm text-purple-800">
-            <strong>Note:</strong> If title documents are not available, the report will state "Title documents not provided; valuation assumes clear, marketable title."
-          </p>
-        </div>
-      </div>
-
+      )}
     </div>
   );
 };
+
+export default IdentificationStep;
