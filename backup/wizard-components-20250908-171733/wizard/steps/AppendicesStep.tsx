@@ -19,13 +19,6 @@ export const AppendicesStep = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
 
-  const handleInputChange = (field: string, value: any) => {
-    // Use setTimeout to debounce the state update and prevent cursor jumping
-    setTimeout(() => {
-      updateStepData('appendices', { [field]: value });
-    }, 0);
-  };
-
   const handleFileUpload = async (category: 'files' | 'photos', files: FileList | null) => {
     if (!files || !state.reportId) return;
 
@@ -479,7 +472,7 @@ export const AppendicesStep = () => {
             </label>
             <select
               value={appendices.numbering_style || 'letters'}
-              onChange={(e) => handleInputChange('numbering_style', e.target.value)}
+              onChange={(e) => updateStepData('appendices', { numbering_style: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="letters">Letters (A, B, C...)</option>
@@ -494,7 +487,7 @@ export const AppendicesStep = () => {
             </label>
             <select
               value={appendices.page_layout || 'one_per_page'}
-              onChange={(e) => handleInputChange('page_layout', e.target.value)}
+              onChange={(e) => updateStepData('appendices', { page_layout: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="one_per_page">One Document/Photo per Page</option>
@@ -510,7 +503,7 @@ export const AppendicesStep = () => {
           </label>
           <textarea
             value={appendices.instructions || ''}
-            onChange={(e) => handleInputChange('instructions', e.target.value)}
+            onChange={(e) => updateStepData('appendices', { instructions: e.target.value })}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Add any special instructions for how appendices should be organized or presented in the final report..."

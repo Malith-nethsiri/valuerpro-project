@@ -99,45 +99,113 @@ class AIPropertyExtractor:
         """Fix common mathematical expressions that appear in JSON responses"""
         import re
         
-        # Pattern to find mathematical expressions like "0.0645 * 4046.86"
-        math_pattern = r'(\d+\.?\d*)\s*\*\s*(\d+\.?\d*)'
+        logger.info("Fixing mathematical expressions in JSON content")
         
-        def calculate_expression(match):
-            try:
-                num1 = float(match.group(1))
-                num2 = float(match.group(2))
-                result = num1 * num2
-                # Format to avoid excessive decimal places
-                if result.is_integer():
-                    return str(int(result))
-                else:
-                    return f"{result:.4f}".rstrip('0').rstrip('.')
-            except:
-                return match.group(0)  # Return original if calculation fails
+        # Enhanced patterns to catch various mathematical expressions (more comprehensive)
+        patterns = [
+            # Multiplication with decimal numbers - more specific patterns
+            (r'(\d+\.\d+)\s*\*\s*(\d+\.\d+)', lambda m: self._calculate_multiplication(m)),  # decimal * decimal
+            (r'(\d+)\s*\*\s*(\d+\.\d+)', lambda m: self._calculate_multiplication(m)),        # int * decimal  
+            (r'(\d+\.\d+)\s*\*\s*(\d+)', lambda m: self._calculate_multiplication(m)),        # decimal * int
+            (r'(\d+)\s*\*\s*(\d+)', lambda m: self._calculate_multiplication(m)),             # int * int
+            # Division patterns
+            (r'(\d+\.\d+)\s*/\s*(\d+\.\d+)', lambda m: self._calculate_division(m)),          # decimal / decimal
+            (r'(\d+)\s*/\s*(\d+\.\d+)', lambda m: self._calculate_division(m)),               # int / decimal
+            (r'(\d+\.\d+)\s*/\s*(\d+)', lambda m: self._calculate_division(m)),               # decimal / int
+            (r'(\d+)\s*/\s*(\d+)', lambda m: self._calculate_division(m)),                    # int / int
+            # Addition patterns
+            (r'(\d+\.\d+)\s*\+\s*(\d+\.\d+)', lambda m: self._calculate_addition(m)),        # decimal + decimal
+            (r'(\d+)\s*\+\s*(\d+\.\d+)', lambda m: self._calculate_addition(m)),             # int + decimal
+            (r'(\d+\.\d+)\s*\+\s*(\d+)', lambda m: self._calculate_addition(m)),             # decimal + int
+            (r'(\d+)\s*\+\s*(\d+)', lambda m: self._calculate_addition(m)),                  # int + int
+            # Subtraction patterns  
+            (r'(\d+\.\d+)\s*-\s*(\d+\.\d+)', lambda m: self._calculate_subtraction(m)),      # decimal - decimal
+            (r'(\d+)\s*-\s*(\d+\.\d+)', lambda m: self._calculate_subtraction(m)),           # int - decimal
+            (r'(\d+\.\d+)\s*-\s*(\d+)', lambda m: self._calculate_subtraction(m)),           # decimal - int
+            (r'(\d+)\s*-\s*(\d+)', lambda m: self._calculate_subtraction(m)),                # int - int
+        ]
         
-        # Replace mathematical expressions with calculated values
-        fixed_content = re.sub(math_pattern, calculate_expression, content)
+        fixed_content = content
+        expressions_fixed = 0
         
-        # Also handle division operations
-        div_pattern = r'(\d+\.?\d*)\s*/\s*(\d+\.?\d*)'
-        def calculate_division(match):
-            try:
-                num1 = float(match.group(1))
-                num2 = float(match.group(2))
-                if num2 != 0:
-                    result = num1 / num2
-                    if result.is_integer():
-                        return str(int(result))
-                    else:
-                        return f"{result:.4f}".rstrip('0').rstrip('.')
-                else:
-                    return "null"
-            except:
-                return match.group(0)
+        # Apply each pattern
+        for pattern, calculator in patterns:
+            matches = re.findall(pattern, fixed_content)
+            if matches:
+                logger.info(f"Found {len(matches)} mathematical expressions with pattern: {pattern}")
+                expressions_fixed += len(matches)
+            
+            fixed_content = re.sub(pattern, calculator, fixed_content)
         
-        fixed_content = re.sub(div_pattern, calculate_division, fixed_content)
+        if expressions_fixed > 0:
+            logger.info(f"Fixed {expressions_fixed} mathematical expressions in JSON")
         
         return fixed_content
+    
+    def _calculate_multiplication(self, match):
+        """Calculate multiplication expression safely"""
+        try:
+            num1 = float(match.group(1))
+            num2 = float(match.group(2))
+            result = num1 * num2
+            formatted_result = self._format_number(result)
+            logger.info(f"Calculated: {num1} * {num2} = {formatted_result}")
+            return formatted_result
+        except Exception as e:
+            logger.warning(f"Failed to calculate multiplication: {match.group(0)} - {e}")
+            return match.group(0)  # Return original if calculation fails
+    
+    def _calculate_division(self, match):
+        """Calculate division expression safely"""
+        try:
+            num1 = float(match.group(1))
+            num2 = float(match.group(2))
+            if num2 != 0:
+                result = num1 / num2
+                formatted_result = self._format_number(result)
+                logger.info(f"Calculated: {num1} / {num2} = {formatted_result}")
+                return formatted_result
+            else:
+                logger.warning(f"Division by zero avoided: {match.group(0)}")
+                return "null"
+        except Exception as e:
+            logger.warning(f"Failed to calculate division: {match.group(0)} - {e}")
+            return match.group(0)
+    
+    def _calculate_addition(self, match):
+        """Calculate addition expression safely"""
+        try:
+            num1 = float(match.group(1))
+            num2 = float(match.group(2))
+            result = num1 + num2
+            formatted_result = self._format_number(result)
+            logger.info(f"Calculated: {num1} + {num2} = {formatted_result}")
+            return formatted_result
+        except Exception as e:
+            logger.warning(f"Failed to calculate addition: {match.group(0)} - {e}")
+            return match.group(0)
+    
+    def _calculate_subtraction(self, match):
+        """Calculate subtraction expression safely"""
+        try:
+            num1 = float(match.group(1))
+            num2 = float(match.group(2))
+            result = num1 - num2
+            formatted_result = self._format_number(result)
+            logger.info(f"Calculated: {num1} - {num2} = {formatted_result}")
+            return formatted_result
+        except Exception as e:
+            logger.warning(f"Failed to calculate subtraction: {match.group(0)} - {e}")
+            return match.group(0)
+    
+    def _format_number(self, result: float) -> str:
+        """Format number to avoid excessive decimal places"""
+        if result.is_integer():
+            return str(int(result))
+        else:
+            # Round to 4 decimal places and strip trailing zeros
+            formatted = f"{result:.4f}".rstrip('0').rstrip('.')
+            return formatted if formatted else "0"
     
     def _attempt_json_repair(self, content: str) -> str:
         """Attempt to repair common JSON formatting issues"""
@@ -165,11 +233,15 @@ Analyze this Sri Lankan property document text and extract ALL available informa
 Look for data that could populate ANY section of a comprehensive valuation report.
 Return ONLY valid JSON with the exact structure shown below.
 
-CRITICAL: 
-- Return ONLY valid JSON - no code blocks, no explanations, no mathematical expressions
-- Calculate all mathematical values (e.g. if extent is 0.0645 acres, convert to sqm as 261.02, not "0.0645 * 4046.86")
+CRITICAL JSON REQUIREMENTS: 
+- Return ONLY valid JSON - no code blocks, no markdown, no explanations, no mathematical expressions
+- Calculate ALL mathematical values before putting them in JSON (e.g. if extent is 0.0645 acres, convert to sqm as 261.02, NOT "0.0645 * 4046.86")
+- NEVER include mathematical operators (* / + -) in JSON values
 - Use only numbers, strings, null, booleans, arrays, objects - NO expressions or calculations in JSON
-- All numeric values must be actual numbers, not expressions
+- All numeric values must be actual calculated numbers, not expressions
+- If you need to convert units, do the calculation first and put only the final number
+- Example: "extent_sqm": 261.02 (NOT "extent_sqm": "0.0645 * 4046.86")
+- ALWAYS calculate: acres to sqm (multiply by 4046.86), perches to sqm (multiply by 25.293), perches to acres (divide by 160)
 
 Document Text:
 {ocr_text}
@@ -336,6 +408,9 @@ Extraction Instructions:
 14. For arrays, include all relevant items found
 15. Use null for fields not found in the document
 16. Return confidence based on data quality and completeness
+17. CRITICAL: Always return ONLY valid JSON without mathematical expressions
+
+SYSTEM MESSAGE: Calculate all mathematical values before putting them in JSON. Never include expressions like "0.0645 * 4046.86" - instead calculate and return "261.02". This is essential for system compatibility.
 
 JSON Response:
 """

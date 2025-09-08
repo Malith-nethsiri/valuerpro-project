@@ -4,10 +4,18 @@ import { mapsAPI } from '@/lib/api';
 import { MapIcon, EyeIcon, MapPinIcon, ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 
 export const LocationStep = () => {
+  console.log('🔄 LocationStep: Component rendering at', new Date().toISOString());
+  if (typeof window !== 'undefined') {
+    window.alert('ALERT: LocationStep component is rendering at ' + new Date().toISOString());
+  }
   const { state, updateStepData } = useWizard();
   const location = state.data.location;
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  
+  // Removed refs since we're using controlled inputs
   const [mapsAvailable, setMapsAvailable] = useState<boolean | null>(null);
+  
+  // Removed ref sync useEffect since we're using controlled inputs
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false);
   const [generatedRouteData, setGeneratedRouteData] = useState<any>(null);
   const [routeOriginCity, setRouteOriginCity] = useState<string>('Colombo');
@@ -38,6 +46,10 @@ export const LocationStep = () => {
   };
 
   const handleAddressChange = (field: string, value: string) => {
+    console.log('📝 LocationStep: handleAddressChange called ->', field, value, 'at', new Date().toISOString());
+    if (typeof window !== 'undefined') {
+      window.alert('ALERT: handleAddressChange called for field: ' + field + ' with value: ' + value);
+    }
     const address = location.address || {};
     updateStepData('location', { 
       address: { ...address, [field]: value }

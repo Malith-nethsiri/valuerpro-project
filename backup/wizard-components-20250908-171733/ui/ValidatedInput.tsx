@@ -52,12 +52,13 @@ const ValidatedInputComponent: React.FC<ValidatedInputProps> = ({
   const [touched, setTouched] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Temporarily disable validation to fix cursor issues
-  const error = null;
-  const isValid = true;
-  const isValidating = false;
-  const validate = () => Promise.resolve();
-  const clearError = () => {};
+  const {
+    error,
+    isValid,
+    isValidating,
+    validate,
+    clearError
+  } = useFieldValidation(fieldName, { ...validation, required });
 
   // Update internal value when prop value changes (but avoid unnecessary updates)
   useEffect(() => {
@@ -163,7 +164,6 @@ const ValidatedInputComponent: React.FC<ValidatedInputProps> = ({
           onFocus={handleFocus}
           placeholder={placeholder}
           disabled={disabled}
-          autoComplete={inputProps.autoComplete || 'off'}
           className={baseInputClasses.trim()}
         />
 
@@ -207,8 +207,20 @@ const ValidatedInputComponent: React.FC<ValidatedInputProps> = ({
   );
 };
 
-// Export component without React.memo to allow normal re-renders
-export const ValidatedInput = ValidatedInputComponent;
+// Memoize the component with custom comparison to prevent unnecessary re-renders
+export const ValidatedInput = React.memo(ValidatedInputComponent, (prevProps, nextProps) => {
+  // Only re-render if these specific props change
+  const keysToCheck = ['value', 'fieldName', 'disabled', 'required', 'type', 'placeholder'] as const;
+  
+  for (const key of keysToCheck) {
+    if (prevProps[key] !== nextProps[key]) {
+      return false; // Re-render needed
+    }
+  }
+  
+  // Don't compare onChange function reference - it changes but we handle it with useRef
+  return true; // Skip re-render
+});
 
 // Validated textarea component
 export interface ValidatedTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
@@ -254,12 +266,13 @@ export const ValidatedTextarea: React.FC<ValidatedTextareaProps> = ({
   const [inputValue, setInputValue] = useState<string>(String(value || ''));
   const [touched, setTouched] = useState(false);
   
-  // Temporarily disable validation to fix cursor issues
-  const error = null;
-  const isValid = true;
-  const isValidating = false;
-  const validate = () => Promise.resolve();
-  const clearError = () => {};
+  const {
+    error,
+    isValid,
+    isValidating,
+    validate,
+    clearError
+  } = useFieldValidation(fieldName, { ...validation, required });
 
   useEffect(() => {
     setInputValue(String(value || ''));
@@ -328,7 +341,6 @@ export const ValidatedTextarea: React.FC<ValidatedTextareaProps> = ({
           disabled={disabled}
           rows={rows}
           maxLength={maxLength}
-          autoComplete={textareaProps.autoComplete || 'off'}
           className={baseTextareaClasses.trim()}
         />
 
@@ -408,12 +420,13 @@ export const ValidatedSelect: React.FC<ValidatedSelectProps> = ({
   const [selectValue, setSelectValue] = useState<string>(String(value || ''));
   const [touched, setTouched] = useState(false);
   
-  // Temporarily disable validation to fix cursor issues
-  const error = null;
-  const isValid = true;
-  const isValidating = false;
-  const validate = () => Promise.resolve();
-  const clearError = () => {};
+  const {
+    error,
+    isValid,
+    isValidating,
+    validate,
+    clearError
+  } = useFieldValidation(fieldName, { ...validation, required });
 
   useEffect(() => {
     setSelectValue(String(value || ''));

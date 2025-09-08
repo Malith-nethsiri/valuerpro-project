@@ -1,105 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useGroup } from '../GroupProvider';
+import { useState, useEffect } from 'react';
+import { useWizard } from '../WizardProvider';
 import { mapsAPI } from '@/lib/api';
-import { ValidatedInput } from '@/components/ui/ValidatedInput';
-import { 
-  MapIcon, 
-  EyeIcon, 
-  MapPinIcon, 
-  ArrowsPointingOutIcon,
-  ChevronUpIcon,
-  ChevronDownIcon 
-} from '@heroicons/react/24/outline';
+import { MapIcon, EyeIcon, MapPinIcon, ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 
-// Optimized working input component 
-const WorkingInput = ({ value, onChange, placeholder, label }: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  label: string;
-}) => {
-  const [localValue, setLocalValue] = useState(value);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Only update local state when prop changes from external source
-  useEffect(() => {
-    if (value !== localValue) {
-      setLocalValue(value);
-    }
-  }, [value]); // Removed localValue from dependency to prevent loops
-  
-  // Optimized debounce with cleanup
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    
-    // Clear existing timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    // Set new timeout with shorter delay
-    timeoutRef.current = setTimeout(() => {
-      onChange(newValue);
-    }, 500); // Increased to 500ms for more stability
-  };
-  
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-  
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} (OPTIMIZED VERSION)
-      </label>
-      <input
-        type="text"
-        value={localValue}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className="block w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      />
-    </div>
-  );
-};
-
-export const LocationMappingGroup = () => {
-  const { groupData, updateGroupData } = useGroup();
-  const locationData = groupData.location_mapping.location_details || {};
-  
-  // Memoize location object to prevent unnecessary re-renders
-  const location = useMemo(() => ({
-    // Map the nested structure to flat access for compatibility
-    address: locationData.components || {},
-    latitude: locationData.coordinates?.latitude || '',
-    longitude: locationData.coordinates?.longitude || '',
-    formatted_address: locationData.formatted_address || '',
-    // Add direct properties that might exist at the location_details level
-    district: locationData.district || '',
-    province: locationData.province || '',
-    gn_division: locationData.gn_division || '',
-    ds_division: locationData.ds_division || '',
-    road_access: locationData.road_access || '',
-    road_width: locationData.road_width || '',
-    nearest_landmark: locationData.nearest_landmark || '',
-    directions: locationData.directions || '',
-    public_transport: locationData.public_transport || '',
-    distance_to_town: locationData.distance_to_town || '',
-    distance_to_colombo: locationData.distance_to_colombo || '',
-    nearest_railway_station: locationData.nearest_railway_station || '',
-    // Additional fields from route data
-    route_distance: locationData.route_distance || '',
-    route_duration: locationData.route_duration || '',
-    route_start_address: locationData.route_start_address || ''
-  }), [locationData]);
-  
-  // Local state for UI functionality
+export const LocationStep = () => {
+  const { state, updateStepData } = useWizard();
+  const location = state.data.location;
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const [mapsAvailable, setMapsAvailable] = useState<boolean | null>(null);
   const [isGeneratingRoute, setIsGeneratingRoute] = useState(false);
@@ -111,11 +17,6 @@ export const LocationMappingGroup = () => {
   const [staticMapUrl, setStaticMapUrl] = useState<string>('');
   const [isGeneratingMap, setIsGeneratingMap] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
-  
-  // Collapsible sections
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['address', 'coordinates', 'access'])
-  );
 
   // Check Maps API availability on component mount
   useEffect(() => {
@@ -132,16 +33,16 @@ export const LocationMappingGroup = () => {
     checkMapsAvailability();
   }, []);
 
-  const toggleSection = (sectionId: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(sectionId)) {
-      newExpanded.delete(sectionId);
-    } else {
-      newExpanded.add(sectionId);
-    }
-    setExpandedSections(newExpanded);
+  const handleInputChange = (field: string, value: any) => {
+    updateStepData('location', { [field]: value });
   };
 
+  const handleAddressChange = (field: string, value: string) => {
+    const address = location.address || {};
+    updateStepData('location', { 
+      address: { ...address, [field]: value }
+    });
+  };
 
   // Reverse geocoding function to get address from coordinates
   const reverseGeocodeLocation = async () => {
@@ -165,25 +66,19 @@ export const LocationMappingGroup = () => {
       // Populate address fields from the reverse geocoding result
       const components = addressData.components || {};
       
-      // Update location_details with proper structure
-      const updatedLocationDetails = {
-        ...locationData,
-        components: {
-          ...locationData.components,
-          city: components.city || locationData.components?.city || '',
-          postal_code: components.postal_code || locationData.components?.postal_code || '',
-          street: components.area || locationData.components?.street || '',
-          district: components.district || locationData.components?.district || '',
-          province: components.province || locationData.components?.province || ''
+      // Update basic address
+      updateStepData('location', {
+        address: {
+          ...location.address,
+          city: components.city || location.address?.city || '',
+          postal_code: components.postal_code || location.address?.postal_code || '',
+          street: components.area || location.address?.street || '',
         },
-        formatted_address: addressData.formatted_address,
-        // Also maintain top-level properties for compatibility
-        district: components.district || locationData.district || '',
-        province: components.province || locationData.province || ''
-      };
-
-      updateGroupData('location_mapping', {
-        location_details: updatedLocationDetails
+        // Administrative divisions
+        district: components.district || location.district || '',
+        province: components.province || location.province || '',
+        // Store formatted address for reference
+        formatted_address: addressData.formatted_address
       });
 
       alert('Address populated successfully from coordinates! Please review and adjust as needed.');
@@ -200,7 +95,7 @@ export const LocationMappingGroup = () => {
   const generateRouteDescription = async () => {
     const lat = parseFloat(location.latitude);
     const lng = parseFloat(location.longitude);
-    const nearestCity = routeOriginCity || location.address?.city || 'Colombo';
+    const nearestCity = routeOriginCity || location.address?.city || 'Colombo'; // Use selected origin city
     
     if (!lat || !lng || !mapsAvailable) {
       alert('Please enter valid coordinates first and ensure Maps API is available.');
@@ -245,11 +140,7 @@ export const LocationMappingGroup = () => {
         updateData.distance_to_town = distanceKm;
       }
 
-      // Update location_details with route data
-      const updatedLocationDetails = { ...locationData, ...updateData };
-      updateGroupData('location_mapping', {
-        location_details: updatedLocationDetails
-      });
+      updateStepData('location', updateData);
 
       alert('Route description generated successfully! You can edit the text if needed.');
       
@@ -313,12 +204,8 @@ export const LocationMappingGroup = () => {
         if (colomboDistance && colomboDistance.distance) {
           const distanceKm = parseFloat(colomboDistance.distance.text.replace(/[^\d.]/g, ''));
           if (!isNaN(distanceKm)) {
-            const updatedLocationDetails = { 
-              ...locationData, 
-              distance_to_colombo: distanceKm 
-            };
-            updateGroupData('location_mapping', {
-              location_details: updatedLocationDetails
+            updateStepData('location', {
+              distance_to_colombo: distanceKm
             });
           }
         }
@@ -391,176 +278,150 @@ export const LocationMappingGroup = () => {
     window.open(googleMapsUrl, '_blank');
   };
 
-  const CollapsibleSection = ({ 
-    id, 
-    title, 
-    children, 
-    bgColor = 'bg-blue-50', 
-    borderColor = 'border-blue-200',
-    titleColor = 'text-blue-900'
-  }: {
-    id: string;
-    title: string;
-    children: React.ReactNode;
-    bgColor?: string;
-    borderColor?: string;
-    titleColor?: string;
-  }) => {
-    const isExpanded = expandedSections.has(id);
+  // Property location analysis
+  const analyzePropertyLocation = async () => {
+    const lat = parseFloat(location.latitude);
+    const lng = parseFloat(location.longitude);
+    
+    if (!lat || !lng || !mapsAvailable) {
+      alert('Please enter valid coordinates first and ensure Maps API is available.');
+      return;
+    }
 
-    return (
-      <div className={`${bgColor} border ${borderColor} rounded-lg`}>
-        <button
-          type="button"
-          onClick={() => toggleSection(id)}
-          className={`w-full p-4 text-left flex items-center justify-between hover:bg-opacity-80`}
-        >
-          <h4 className={`text-md font-medium ${titleColor}`}>{title}</h4>
-          {isExpanded ? (
-            <ChevronUpIcon className="w-5 h-5 text-gray-500" />
-          ) : (
-            <ChevronDownIcon className="w-5 h-5 text-gray-500" />
-          )}
-        </button>
-        
-        {isExpanded && (
-          <div className="px-4 pb-4">
-            {children}
-          </div>
-        )}
-      </div>
-    );
+    try {
+      const analysisData = await mapsAPI.analyzePropertyLocation(lat, lng);
+      
+      if (analysisData.error) {
+        alert(`Location analysis failed: ${analysisData.error}`);
+        return;
+      }
+
+      // Display analysis results
+      let analysisMessage = 'Location Analysis:\n\n';
+      
+      if (analysisData.address) {
+        analysisMessage += `Address: ${analysisData.address.formatted_address}\n`;
+      }
+      
+      if (analysisData.access_route) {
+        analysisMessage += `Route Info: ${analysisData.access_route.distance} (${analysisData.access_route.duration})\n`;
+      }
+      
+      if (analysisData.static_map_url) {
+        setStaticMapUrl(analysisData.static_map_url);
+      }
+      
+      alert(analysisMessage || 'Location analysis completed successfully!');
+      
+    } catch (error: any) {
+      console.error('Location analysis error:', error);
+      alert(`Failed to analyze location: ${error.message || 'Unknown error'}`);
+    }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Location Verification & Mapping
+          Location & Access
         </h3>
         <p className="text-sm text-gray-600 mb-6">
-          Complete location verification including address details, GPS coordinates, mapping, and access information. All data from AI analysis will be automatically populated where available.
+          Provide complete location details including address, administrative divisions, and GPS coordinates.
         </p>
       </div>
 
       {/* Property Address */}
-      <CollapsibleSection 
-        id="address" 
-        title="Property Address"
-        bgColor="bg-blue-50" 
-        borderColor="border-blue-200"
-        titleColor="text-blue-900"
-      >
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="text-md font-medium text-blue-900 mb-4">Property Address</h4>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <WorkingInput
-              label="House/Building Number & Name"
+            <label htmlFor="house-no" className="block text-sm font-medium text-gray-700 mb-2">
+              House/Building Number & Name
+            </label>
+            <input
+              type="text"
+              id="house-no"
               value={location.address?.house_number || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  components: {
-                    ...locationData.components,
-                    house_number: value
-                  }
-                }
-              })}
+              onChange={(e) => handleAddressChange('house_number', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., No. 123, Lotus Villa"
             />
           </div>
 
           <div className="md:col-span-2">
-            <ValidatedInput
-              fieldName="street"
-              label="Street/Road Name"
+            <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-2">
+              Street/Road Name
+            </label>
+            <input
+              type="text"
+              id="street"
               value={location.address?.street || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  components: {
-                    ...locationData.components,
-                    street: value
-                  }
-                }
-              })}
+              onChange={(e) => handleAddressChange('street', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Galle Road"
             />
           </div>
 
           <div>
-            <ValidatedInput
-              fieldName="city"
-              label="City/Town"
+            <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+              City/Town *
+            </label>
+            <input
+              type="text"
+              id="city"
               value={location.address?.city || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  components: {
-                    ...locationData.components,
-                    city: value
-                  }
-                }
-              })}
+              onChange={(e) => handleAddressChange('city', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Colombo"
-              required
             />
           </div>
 
           <div>
-            <ValidatedInput
-              fieldName="postal_code"
-              label="Postal Code"
+            <label htmlFor="postal-code" className="block text-sm font-medium text-gray-700 mb-2">
+              Postal Code
+            </label>
+            <input
+              type="text"
+              id="postal-code"
               value={location.address?.postal_code || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  components: {
-                    ...locationData.components,
-                    postal_code: value
-                  }
-                }
-              })}
+              onChange={(e) => handleAddressChange('postal_code', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., 00300"
             />
           </div>
         </div>
-      </CollapsibleSection>
+      </div>
 
       {/* Administrative Divisions */}
-      <CollapsibleSection 
-        id="divisions" 
-        title="Administrative Divisions"
-        bgColor="bg-green-50" 
-        borderColor="border-green-200"
-        titleColor="text-green-900"
-      >
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <h4 className="text-md font-medium text-green-900 mb-4">Administrative Divisions</h4>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <ValidatedInput
-              fieldName="gn_division"
-              label="Grama Niladhari Division"
+            <label htmlFor="gn-division" className="block text-sm font-medium text-gray-700 mb-2">
+              Grama Niladhari Division
+            </label>
+            <input
+              type="text"
+              id="gn-division"
               value={location.gn_division || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  gn_division: value
-                }
-              })}
+              onChange={(e) => handleInputChange('gn_division', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Bambalapitiya"
             />
           </div>
 
           <div>
-            <ValidatedInput
-              fieldName="ds_division"
-              label="Divisional Secretariat"
+            <label htmlFor="ds-division" className="block text-sm font-medium text-gray-700 mb-2">
+              Divisional Secretariat
+            </label>
+            <input
+              type="text"
+              id="ds-division"
               value={location.ds_division || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  ds_division: value
-                }
-              })}
+              onChange={(e) => handleInputChange('ds_division', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Colombo"
             />
           </div>
@@ -571,20 +432,8 @@ export const LocationMappingGroup = () => {
             </label>
             <select
               id="district"
-              name="district"
-              autoComplete="address-level2"
               value={location.district || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  components: {
-                    ...locationData.components,
-                    district: e.target.value
-                  },
-                  // Also set at the top level for compatibility
-                  district: e.target.value
-                }
-              })}
+              onChange={(e) => handleInputChange('district', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select District...</option>
@@ -622,19 +471,8 @@ export const LocationMappingGroup = () => {
             </label>
             <select
               id="province"
-              name="province"
               value={location.province || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  components: {
-                    ...locationData.components,
-                    province: e.target.value
-                  },
-                  // Also set at the top level for compatibility
-                  province: e.target.value
-                }
-              })}
+              onChange={(e) => handleInputChange('province', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select Province...</option>
@@ -650,52 +488,38 @@ export const LocationMappingGroup = () => {
             </select>
           </div>
         </div>
-      </CollapsibleSection>
+      </div>
 
       {/* GPS Coordinates */}
-      <CollapsibleSection 
-        id="coordinates" 
-        title="GPS Coordinates & Mapping"
-        bgColor="bg-yellow-50" 
-        borderColor="border-yellow-200"
-        titleColor="text-yellow-900"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h4 className="text-md font-medium text-yellow-900 mb-4">GPS Coordinates</h4>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <ValidatedInput
-              fieldName="latitude"
-              label="Latitude"
+            <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-2">
+              Latitude
+            </label>
+            <input
+              type="text"
+              id="latitude"
               value={location.latitude || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  coordinates: {
-                    ...locationData.coordinates,
-                    latitude: value
-                  }
-                }
-              })}
+              onChange={(e) => handleInputChange('latitude', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., 6.9271"
-              type="number"
             />
           </div>
 
           <div>
-            <ValidatedInput
-              fieldName="longitude"
-              label="Longitude"
+            <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-2">
+              Longitude
+            </label>
+            <input
+              type="text"
+              id="longitude"
               value={location.longitude || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  coordinates: {
-                    ...locationData.coordinates,
-                    longitude: value
-                  }
-                }
-              })}
+              onChange={(e) => handleInputChange('longitude', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., 79.8612"
-              type="number"
             />
           </div>
 
@@ -712,187 +536,86 @@ export const LocationMappingGroup = () => {
                 }`}
                 title="Get address information from coordinates using Google Maps"
               >
-                {isReverseGeocoding ? 'Getting Address...' : '📍 Get Address'}
+                {isReverseGeocoding ? 'Getting Address...' : '📍 Get Address from Coordinates'}
               </button>
+            )}
+            
+            {mapsAvailable === false && (
+              <p className="text-xs text-gray-500">
+                Maps API not available - address lookup disabled
+              </p>
             )}
           </div>
         </div>
 
-        {/* Interactive Map Display */}
-        <div className="bg-white border border-yellow-300 rounded-lg p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h5 className="text-sm font-medium text-yellow-900">
-              🗺️ Interactive Location Map
-            </h5>
-            {mapsAvailable && (
-              <button
-                type="button"
-                onClick={() => generateStaticMap()}
-                disabled={isGeneratingMap || !location.latitude || !location.longitude}
-                className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md ${
-                  isGeneratingMap || !location.latitude || !location.longitude
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
-                }`}
-              >
-                {isGeneratingMap ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                ) : (
-                  <MapPinIcon className="h-4 w-4 mr-2" />
-                )}
-                {isGeneratingMap ? 'Loading...' : 'Generate Map'}
-              </button>
-            )}
-          </div>
-
-          {staticMapUrl ? (
-            <div className="space-y-3">
-              {/* Map Type Selector */}
-              <div className="flex gap-2">
-                <label className="text-sm font-medium text-yellow-700 mr-2">View:</label>
-                {[
-                  { value: 'roadmap', label: 'Road' },
-                  { value: 'satellite', label: 'Satellite' },
-                  { value: 'hybrid', label: 'Hybrid' },
-                  { value: 'terrain', label: 'Terrain' }
-                ].map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => handleMapTypeChange(type.value)}
-                    className={`px-3 py-1 text-xs font-medium rounded-md border ${
-                      mapType === type.value
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50'
-                    }`}
-                  >
-                    {type.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="relative">
-                <div className="bg-white border border-yellow-300 rounded-lg overflow-hidden">
-                  <img
-                    src={staticMapUrl}
-                    alt="Property Location Map"
-                    className="w-full h-auto max-w-full"
-                    style={{ maxHeight: '400px', objectFit: 'contain' }}
-                  />
-                  <div className="absolute top-2 right-2 bg-white bg-opacity-90 rounded-md p-2">
-                    <div className="text-xs text-gray-600">
-                      📍 {location.latitude}, {location.longitude}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={openGoogleMaps}
-                    className="inline-flex items-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50"
-                  >
-                    <EyeIcon className="h-4 w-4 mr-2" />
-                    View Full Map
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setShowMapModal(true)}
-                    className="inline-flex items-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50"
-                  >
-                    <ArrowsPointingOutIcon className="h-4 w-4 mr-2" />
-                    Enlarge Map
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-4 text-center">
-              <MapPinIcon className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
-              <p className="text-sm text-yellow-700 mb-3">
-                Enter GPS coordinates above and click "Generate Map" to view location
-              </p>
-            </div>
+        <div className="mt-3 p-3 bg-yellow-100 rounded border border-yellow-200">
+          <p className="text-sm text-yellow-800">
+            <strong>Note:</strong> GPS coordinates help with accurate mapping and location verification. Enter coordinates manually from your survey data, or use "Get Address from Coordinates" to auto-populate address fields from existing coordinates.
+          </p>
+          {location.formatted_address && (
+            <p className="text-xs text-yellow-700 mt-2">
+              <strong>Last geocoded address:</strong> {location.formatted_address}
+            </p>
           )}
         </div>
-      </CollapsibleSection>
+      </div>
 
       {/* Access & Directions */}
-      <CollapsibleSection 
-        id="access" 
-        title="Access & Directions"
-        bgColor="bg-purple-50" 
-        borderColor="border-purple-200"
-        titleColor="text-purple-900"
-      >
+      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <h4 className="text-md font-medium text-purple-900 mb-4">Access & Directions</h4>
+        
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="road-access" className="block text-sm font-medium text-gray-700 mb-2">
-                Road Access
-              </label>
-              <select
-                id="road-access"
-                name="road-access"
-                value={location.road_access || ''}
-                onChange={(e) => updateGroupData('location_mapping', {
-                  location_details: {
-                    ...locationData,
-                    road_access: e.target.value
-                  }
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select road access...</option>
-                <option value="Main road">Main Road (Direct access)</option>
-                <option value="Side road">Side Road</option>
-                <option value="Lane">Lane</option>
-                <option value="Private road">Private Road</option>
-                <option value="No direct access">No Direct Road Access</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="road-width" className="block text-sm font-medium text-gray-700 mb-2">
-                Road Width (meters)
-              </label>
-              <input
-                type="number"
-                id="road-width"
-                name="road-width"
-                step="0.1"
-                value={location.road_width || ''}
-                onChange={(e) => updateGroupData('location_mapping', {
-                  location_details: {
-                    ...locationData,
-                    road_width: parseFloat(e.target.value) || ''
-                  }
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., 4.5"
-              />
-            </div>
+          <div>
+            <label htmlFor="road-access" className="block text-sm font-medium text-gray-700 mb-2">
+              Road Access
+            </label>
+            <select
+              id="road-access"
+              value={location.road_access || ''}
+              onChange={(e) => handleInputChange('road_access', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Select road access...</option>
+              <option value="Main road">Main Road (Direct access)</option>
+              <option value="Side road">Side Road</option>
+              <option value="Lane">Lane</option>
+              <option value="Private road">Private Road</option>
+              <option value="No direct access">No Direct Road Access</option>
+            </select>
           </div>
 
           <div>
-            <ValidatedInput
-              fieldName="nearest_landmark"
-              label="Nearest Landmark"
+            <label htmlFor="road-width" className="block text-sm font-medium text-gray-700 mb-2">
+              Road Width (meters)
+            </label>
+            <input
+              type="number"
+              id="road-width"
+              step="0.1"
+              value={location.road_width || ''}
+              onChange={(e) => handleInputChange('road_width', parseFloat(e.target.value) || '')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., 4.5"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="nearest-landmark" className="block text-sm font-medium text-gray-700 mb-2">
+              Nearest Landmark
+            </label>
+            <input
+              type="text"
+              id="nearest-landmark"
               value={location.nearest_landmark || ''}
-              onChange={(value) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  nearest_landmark: value
-                }
-              })}
+              onChange={(e) => handleInputChange('nearest_landmark', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Next to Galle Face Green"
             />
           </div>
 
           {/* Route Generation Section */}
           {mapsAvailable && (
-            <div className="p-3 bg-purple-100 rounded-lg border border-purple-200">
+            <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
               <h5 className="text-sm font-medium text-purple-900 mb-3">🗺️ Auto-Generate Directions</h5>
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
@@ -924,6 +647,7 @@ export const LocationMappingGroup = () => {
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
                       : 'bg-white text-purple-700 hover:bg-purple-50 border-purple-300 hover:border-purple-400'
                   }`}
+                  title="Generate route description from coordinates using Google Maps"
                 >
                   {isGeneratingRoute ? 'Generating...' : 'Generate Route'}
                 </button>
@@ -937,17 +661,11 @@ export const LocationMappingGroup = () => {
             </label>
             <textarea
               id="directions"
-              name="directions"
               value={location.directions || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  directions: e.target.value
-                }
-              })}
+              onChange={(e) => handleInputChange('directions', e.target.value)}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Provide detailed directions from the nearest main road or landmark..."
+              placeholder="Provide detailed directions from the nearest main road or landmark, or generate automatically using coordinates..."
             />
             
             {/* Display route information if available */}
@@ -968,16 +686,12 @@ export const LocationMappingGroup = () => {
             )}
           </div>
         </div>
-      </CollapsibleSection>
+      </div>
 
       {/* Transportation & Connectivity */}
-      <CollapsibleSection 
-        id="transport" 
-        title="Transportation & Connectivity"
-        bgColor="bg-gray-50" 
-        borderColor="border-gray-200"
-        titleColor="text-gray-900"
-      >
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 className="text-md font-medium text-gray-900 mb-4">Transportation & Connectivity</h4>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="public-transport" className="block text-sm font-medium text-gray-700 mb-2">
@@ -985,14 +699,8 @@ export const LocationMappingGroup = () => {
             </label>
             <select
               id="public-transport"
-              name="public-transport"
               value={location.public_transport || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  public_transport: e.target.value
-                }
-              })}
+              onChange={(e) => handleInputChange('public_transport', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select access level...</option>
@@ -1011,15 +719,9 @@ export const LocationMappingGroup = () => {
             <input
               type="number"
               id="distance-town"
-              name="distance-town"
               step="0.1"
               value={location.distance_to_town || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  distance_to_town: parseFloat(e.target.value) || ''
-                }
-              })}
+              onChange={(e) => handleInputChange('distance_to_town', parseFloat(e.target.value) || '')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., 2.5"
             />
@@ -1032,15 +734,9 @@ export const LocationMappingGroup = () => {
             <input
               type="number"
               id="distance-colombo"
-              name="distance-colombo"
               step="0.1"
               value={location.distance_to_colombo || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  distance_to_colombo: parseFloat(e.target.value) || ''
-                }
-              })}
+              onChange={(e) => handleInputChange('distance_to_colombo', parseFloat(e.target.value) || '')}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., 15.0"
             />
@@ -1053,34 +749,22 @@ export const LocationMappingGroup = () => {
             <input
               type="text"
               id="nearest-station"
-              name="nearest-station"
               value={location.nearest_railway_station || ''}
-              onChange={(e) => updateGroupData('location_mapping', {
-                location_details: {
-                  ...locationData,
-                  nearest_railway_station: e.target.value
-                }
-              })}
+              onChange={(e) => handleInputChange('nearest_railway_station', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Bambalapitiya Railway Station"
             />
           </div>
         </div>
-      </CollapsibleSection>
+      </div>
 
-      {/* Distance Calculator */}
+      {/* Distance Matrix Calculation */}
       {mapsAvailable && (
-        <CollapsibleSection 
-          id="distance-calc" 
-          title="Distance Calculator"
-          bgColor="bg-orange-50" 
-          borderColor="border-orange-200"
-          titleColor="text-orange-900"
-        >
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
           <div className="flex justify-between items-center mb-4">
-            <p className="text-sm text-orange-700">
-              Calculate driving distances and travel times to major cities in Sri Lanka using Google Maps data.
-            </p>
+            <h4 className="text-md font-medium text-orange-900">
+              📏 Distance Calculator
+            </h4>
             <button
               type="button"
               onClick={calculateDistances}
@@ -1090,14 +774,19 @@ export const LocationMappingGroup = () => {
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
                   : 'bg-white text-orange-700 hover:bg-orange-50 border-orange-300 hover:border-orange-400'
               }`}
+              title="Calculate distances to major Sri Lankan cities using Google Distance Matrix"
             >
               {isCalculatingDistances ? 'Calculating...' : 'Calculate Distances'}
             </button>
           </div>
+          
+          <p className="text-sm text-orange-700 mb-4">
+            Calculate driving distances and travel times to major cities in Sri Lanka using Google Maps data.
+          </p>
 
           {/* Display calculated distances */}
           {calculatedDistances && calculatedDistances.distances && calculatedDistances.distances[0] && (
-            <div className="space-y-2">
+            <div className="mt-4 space-y-2">
               <h5 className="text-sm font-medium text-orange-900">Distance Results:</h5>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                 {calculatedDistances.distances[0].destinations.map((dest: any, index: number) => (
@@ -1116,8 +805,158 @@ export const LocationMappingGroup = () => {
               </div>
             </div>
           )}
-        </CollapsibleSection>
+        </div>
       )}
+
+      {/* Interactive Map Display */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-md font-medium text-blue-900">
+            🗺️ Interactive Location Map
+          </h4>
+          {mapsAvailable && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => generateStaticMap()}
+                disabled={isGeneratingMap || !location.latitude || !location.longitude}
+                className={`inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md ${
+                  isGeneratingMap || !location.latitude || !location.longitude
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                }`}
+              >
+                {isGeneratingMap ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <MapPinIcon className="h-4 w-4 mr-2" />
+                )}
+                {isGeneratingMap ? 'Loading...' : 'Generate Map'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!mapsAvailable ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <div className="flex">
+              <MapIcon className="h-5 w-5 text-yellow-400 mr-2" />
+              <p className="text-sm text-yellow-700">
+                Google Maps API is not available. Map features are disabled.
+              </p>
+            </div>
+          </div>
+        ) : !location.latitude || !location.longitude ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <div className="flex">
+              <MapPinIcon className="h-5 w-5 text-yellow-400 mr-2" />
+              <p className="text-sm text-yellow-700">
+                Enter valid GPS coordinates above to view the interactive map.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Map Type Selector */}
+            <div className="flex gap-2 mb-3">
+              <label className="text-sm font-medium text-blue-700 mr-2">Map View:</label>
+              <div className="flex gap-1">
+                {[
+                  { value: 'roadmap', label: 'Road' },
+                  { value: 'satellite', label: 'Satellite' },
+                  { value: 'hybrid', label: 'Hybrid' },
+                  { value: 'terrain', label: 'Terrain' }
+                ].map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => handleMapTypeChange(type.value)}
+                    className={`px-3 py-1 text-xs font-medium rounded-md border ${
+                      mapType === type.value
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Static Map Display */}
+            {staticMapUrl ? (
+              <div className="relative">
+                <div className="bg-white border border-blue-200 rounded-lg overflow-hidden">
+                  <img
+                    src={staticMapUrl}
+                    alt="Property Location Map"
+                    className="w-full h-auto max-w-full"
+                    style={{ maxHeight: '400px', objectFit: 'contain' }}
+                  />
+                  <div className="absolute top-2 right-2 bg-white bg-opacity-90 rounded-md p-2">
+                    <div className="text-xs text-gray-600">
+                      📍 {location.latitude}, {location.longitude}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Map Action Buttons */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={openGoogleMaps}
+                    className="inline-flex items-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <EyeIcon className="h-4 w-4 mr-2" />
+                    View Full Map
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowMapModal(true)}
+                    className="inline-flex items-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <ArrowsPointingOutIcon className="h-4 w-4 mr-2" />
+                    Enlarge Map
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={analyzePropertyLocation}
+                    className="inline-flex items-center px-3 py-2 border border-green-300 text-sm font-medium rounded-md text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    Analyze Location
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-blue-100 border border-blue-200 rounded-lg p-4 text-center">
+                <MapPinIcon className="h-8 w-8 text-blue-400 mx-auto mb-2" />
+                <p className="text-sm text-blue-700 mb-3">
+                  Click "Generate Map" to view the property location
+                </p>
+                <div className="text-xs text-blue-600">
+                  Coordinates: {location.latitude}, {location.longitude}
+                </div>
+              </div>
+            )}
+
+            {/* Map Information Panel */}
+            <div className="bg-blue-100 border border-blue-200 rounded-md p-3">
+              <div className="text-sm text-blue-800">
+                <strong>Map Features:</strong>
+                <ul className="list-disc list-inside mt-1 text-xs space-y-1">
+                  <li>Interactive map with property pin marker</li>
+                  <li>Multiple view types: Road, Satellite, Hybrid, Terrain</li>
+                  <li>Click "View Full Map" to open in Google Maps</li>
+                  <li>Use "Analyze Location" for comprehensive area analysis</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Map Modal for Enlarged View */}
       {showMapModal && staticMapUrl && (

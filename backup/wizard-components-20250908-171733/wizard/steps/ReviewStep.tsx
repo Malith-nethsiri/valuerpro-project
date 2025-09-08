@@ -20,13 +20,6 @@ export const ReviewStep = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
 
-  const handleInputChange = (field: string, value: any) => {
-    // Use setTimeout to debounce the state update and prevent cursor jumping
-    setTimeout(() => {
-      updateStepData('review', { [field]: value });
-    }, 0);
-  };
-
   useEffect(() => {
     validateReport();
   }, [data]);
@@ -540,7 +533,7 @@ export const ReviewStep = () => {
           </label>
           <textarea
             value={review.final_notes || ''}
-            onChange={(e) => handleInputChange('final_notes', e.target.value)}
+            onChange={(e) => updateStepData('review', { final_notes: e.target.value })}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Add any final notes or comments about this valuation report..."

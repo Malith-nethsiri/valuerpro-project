@@ -18,13 +18,6 @@ export const ValuationStep = () => {
   const valuation = state.data.valuation;
   const [selectedLineType, setSelectedLineType] = useState('land');
 
-  const handleInputChange = (field: string, value: any) => {
-    // Use setTimeout to debounce the state update and prevent cursor jumping
-    setTimeout(() => {
-      updateStepData('valuation', { [field]: value });
-    }, 0);
-  };
-
   const addValuationLine = () => {
     const newLine: ValuationLine = {
       id: Date.now().toString(),
@@ -175,7 +168,7 @@ export const ValuationStep = () => {
             </label>
             <select
               value={valuation.method || 'cost_approach'}
-              onChange={(e) => handleInputChange('method', e.target.value)}
+              onChange={(e) => updateStepData('valuation', { method: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="cost_approach">Cost Approach (Land + Buildings)</option>
@@ -192,9 +185,9 @@ export const ValuationStep = () => {
             <input
               type="date"
               value={valuation.valuation_date ? valuation.valuation_date.split('T')[0] : ''}
-              onChange={(e) => handleInputChange('valuation_date', 
-                e.target.value ? new Date(e.target.value).toISOString() : ''
-              )}
+              onChange={(e) => updateStepData('valuation', { 
+                valuation_date: e.target.value ? new Date(e.target.value).toISOString() : '' 
+              })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -388,7 +381,7 @@ export const ValuationStep = () => {
             </label>
             <textarea
               value={valuation.land_rate_justification || ''}
-              onChange={(e) => handleInputChange('land_rate_justification', e.target.value)}
+              onChange={(e) => updateStepData('valuation', { land_rate_justification: e.target.value })}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Explain how the land rate was determined based on market analysis, comparable sales, location factors, etc..."
@@ -401,7 +394,7 @@ export const ValuationStep = () => {
             </label>
             <textarea
               value={valuation.building_rate_justification || ''}
-              onChange={(e) => handleInputChange('building_rate_justification', e.target.value)}
+              onChange={(e) => updateStepData('valuation', { building_rate_justification: e.target.value })}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Explain how building construction rates were determined, including depreciation factors, condition, and market rates..."
@@ -414,7 +407,7 @@ export const ValuationStep = () => {
             </label>
             <textarea
               value={valuation.valuation_comments || ''}
-              onChange={(e) => handleInputChange('valuation_comments', e.target.value)}
+              onChange={(e) => updateStepData('valuation', { valuation_comments: e.target.value })}
               rows={4}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
               placeholder="Provide overall comments on the valuation approach, any assumptions made, market conditions, and factors affecting the value..."

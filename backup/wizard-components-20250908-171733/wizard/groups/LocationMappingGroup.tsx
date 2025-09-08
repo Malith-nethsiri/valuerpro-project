@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useGroup } from '../GroupProvider';
 import { mapsAPI } from '@/lib/api';
 import { ValidatedInput } from '@/components/ui/ValidatedInput';
@@ -11,69 +11,11 @@ import {
   ChevronDownIcon 
 } from '@heroicons/react/24/outline';
 
-// Optimized working input component 
-const WorkingInput = ({ value, onChange, placeholder, label }: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  label: string;
-}) => {
-  const [localValue, setLocalValue] = useState(value);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Only update local state when prop changes from external source
-  useEffect(() => {
-    if (value !== localValue) {
-      setLocalValue(value);
-    }
-  }, [value]); // Removed localValue from dependency to prevent loops
-  
-  // Optimized debounce with cleanup
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    
-    // Clear existing timeout
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    
-    // Set new timeout with shorter delay
-    timeoutRef.current = setTimeout(() => {
-      onChange(newValue);
-    }, 500); // Increased to 500ms for more stability
-  };
-  
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-  
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} (OPTIMIZED VERSION)
-      </label>
-      <input
-        type="text"
-        value={localValue}
-        onChange={handleChange}
-        placeholder={placeholder}
-        className="block w-full px-3 py-2 border border-blue-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      />
-    </div>
-  );
-};
-
 export const LocationMappingGroup = () => {
   const { groupData, updateGroupData } = useGroup();
   const locationData = groupData.location_mapping.location_details || {};
   
-  // Memoize location object to prevent unnecessary re-renders
+  // Memoize the location object to prevent recalculation on every render
   const location = useMemo(() => ({
     // Map the nested structure to flat access for compatibility
     address: locationData.components || {},
@@ -453,7 +395,8 @@ export const LocationMappingGroup = () => {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <WorkingInput
+            <ValidatedInput
+              fieldName="house_number"
               label="House/Building Number & Name"
               value={location.address?.house_number || ''}
               onChange={(value) => updateGroupData('location_mapping', {
@@ -572,7 +515,6 @@ export const LocationMappingGroup = () => {
             <select
               id="district"
               name="district"
-              autoComplete="address-level2"
               value={location.district || ''}
               onChange={(e) => updateGroupData('location_mapping', {
                 location_details: {

@@ -54,7 +54,6 @@ const initialState: WizardState = {
 };
 
 const wizardReducer = (state: WizardState, action: WizardAction): WizardState => {
-  console.log('🚨 WizardProvider: Dispatch triggered ->', action.type, action.payload, 'at', new Date().toISOString());
   switch (action.type) {
     case 'SET_STEP':
       return { ...state, currentStep: action.payload };
@@ -155,7 +154,7 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
     return () => {
       if (saveTimer) clearTimeout(saveTimer);
     };
-  }, [state.isDirty, state.reportId]); // Removed state.data to prevent re-renders on every keystroke
+  }, [state.isDirty, state.data, state.reportId]);
 
   const goToStep = (step: number) => {
     if (step >= 0 && step < 15 && canGoToStep(step)) {
@@ -1109,13 +1108,10 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
     console.log('AI analysis data has been populated across wizard steps');
   };
 
-  const saveReport = async (showLoading: boolean = false): Promise<void> => {
+  const saveReport = async (): Promise<void> => {
     if (!state.reportId) return;
     
-    // Only show loading state if explicitly requested (not during auto-save)
-    if (showLoading) {
-      dispatch({ type: 'SET_LOADING', payload: true });
-    }
+    dispatch({ type: 'SET_LOADING', payload: true });
     try {
       // Update report basic info
       await reportsAPI.update(state.reportId, {
@@ -1137,18 +1133,12 @@ export const WizardProvider = ({ children, editMode = false, reportId }: WizardP
         });
       }
 
-      // Only update dirty state if not already false (prevent unnecessary re-renders)
-      if (state.isDirty) {
-        dispatch({ type: 'SET_DIRTY', payload: false });
-      }
+      dispatch({ type: 'SET_DIRTY', payload: false });
     } catch (error) {
       console.error('Error saving report:', error);
       throw error;
     } finally {
-      // Only hide loading state if it was shown
-      if (showLoading) {
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
