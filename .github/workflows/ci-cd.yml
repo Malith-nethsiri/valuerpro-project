@@ -223,13 +223,13 @@ jobs:
         python-version: '3.11'
     
     - name: Download test results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v5
       with:
         name: frontend-test-results
         path: ./test-results/frontend/
     
     - name: Download backend benchmarks
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v5
       with:
         name: backend-performance-benchmarks
         path: ./test-results/backend/
